@@ -3,7 +3,19 @@ import {
   ErroTransicaoInvalida,
   ErroValidacao,
 } from '../../compartilhado/erros/erros-dominio';
-import { OSAberta, StatusOSAlterado } from './eventos';
+import {
+  DiagnosticoConcluido,
+  OrcamentoGerado,
+  OSAberta,
+  StatusOSAlterado,
+} from './eventos';
+import {
+  arredondar2,
+  ItemPeca,
+  ItemServico,
+  Orcamento,
+  StatusOrcamento,
+} from './itens';
 import { StatusOS, transicaoPermitida } from './status-os';
 
 export interface RegistroHistorico {
@@ -22,6 +34,9 @@ interface PropsOrdemServico {
   pago: boolean;
   criadoEm: Date;
   historico: RegistroHistorico[];
+  itensServico: ItemServico[];
+  itensPeca: ItemPeca[];
+  orcamento: Orcamento | null;
 }
 
 /**
@@ -64,6 +79,9 @@ export class OrdemServico extends AgregadoRaiz<string> {
       historico: [
         { status: StatusOS.RECEBIDA, em: agora, por: entrada.por ?? null },
       ],
+      itensServico: [],
+      itensPeca: [],
+      orcamento: null,
     });
     os.registrarEvento(new OSAberta(os.id, os.numero));
     return os;
@@ -94,6 +112,62 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(new StatusOSAlterado(this.id, anterior, novo));
   }
 
+  /**
+   * Registra o diagnóstico: grava os itens (com preços já congelados pela
+   * aplicação), gera o orçamento (totais calculados aqui — regra de domínio) e
+   * leva a OS de Recebida para Em diagnóstico. Se a OS não estiver em Recebida,
+   * a própria máquina de estados rejeita (HTTP 422).
+   */
+  registrarDiagnostico(entrada: {
+    itensServico: ItemServico[];
+    itensPeca: ItemPeca[];
+    orcamentoId: string;
+    por?: string | null;
+  }): void {
+    if (entrada.itensServico.length === 0 && entrada.itensPeca.length === 0) {
+      throw new ErroValidacao(
+        'O diagnóstico precisa de ao menos um serviço ou peça.',
+      );
+    }
+
+    this.transicionarPara(StatusOS.EM_DIAGNOSTICO, entrada.por);
+
+    this.props.itensServico = entrada.itensServico;
+    this.props.itensPeca = entrada.itensPeca;
+
+    const totalServicos = arredondar2(
+      entrada.itensServico.reduce(
+        (soma, i) => soma + i.precoAplicado * i.quantidade,
+        0,
+      ),
+    );
+    const totalPecas = arredondar2(
+      entrada.itensPeca.reduce(
+        (soma, i) => soma + i.precoAplicado * i.quantidade,
+        0,
+      ),
+    );
+
+    this.props.orcamento = {
+      id: entrada.orcamentoId,
+      totalServicos,
+      totalPecas,
+      total: arredondar2(totalServicos + totalPecas),
+      status: StatusOrcamento.GERADO,
+      enviadoEm: null,
+      respondidoEm: null,
+    };
+
+    this.registrarEvento(new DiagnosticoConcluido(this.id));
+    this.registrarEvento(
+      new OrcamentoGerado(
+        this.id,
+        this.props.orcamento.id,
+        this.props.orcamento.total,
+      ),
+    );
+  }
+
   get numero(): string {
     return this.props.numero;
   }
@@ -120,5 +194,14 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
   get historico(): readonly RegistroHistorico[] {
     return this.props.historico;
+  }
+  get itensServico(): readonly ItemServico[] {
+    return this.props.itensServico;
+  }
+  get itensPeca(): readonly ItemPeca[] {
+    return this.props.itensPeca;
+  }
+  get orcamento(): Orcamento | null {
+    return this.props.orcamento;
   }
 }

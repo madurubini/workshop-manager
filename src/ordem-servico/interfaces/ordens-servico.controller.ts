@@ -21,12 +21,18 @@ import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
 import { UsuarioAtual } from '../../identidade/interfaces/usuario-atual.decorator';
 import { UsuarioAutenticado } from '../../identidade/infraestrutura/jwt.strategy';
 import { AbrirOrdemServico } from '../aplicacao/abrir-ordem-servico.usecase';
+import { RegistrarDiagnostico } from '../aplicacao/registrar-diagnostico.usecase';
 import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
 } from '../dominio/repositorios';
 import { StatusOS } from '../dominio/status-os';
-import { AbrirOrdemServicoDto, OrdemServicoRespostaDto } from './dtos';
+import {
+  AbrirOrdemServicoDto,
+  DiagnosticoRespostaDto,
+  OrdemServicoRespostaDto,
+  RegistrarDiagnosticoDto,
+} from './dtos';
 
 @ApiTags('Ordens de Serviço')
 @ApiBearerAuth()
@@ -35,6 +41,7 @@ import { AbrirOrdemServicoDto, OrdemServicoRespostaDto } from './dtos';
 export class OrdensServicoController {
   constructor(
     private readonly abrirOrdemServico: AbrirOrdemServico,
+    private readonly registrarDiagnostico: RegistrarDiagnostico,
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
   ) {}
@@ -73,5 +80,25 @@ export class OrdensServicoController {
       throw new NotFoundException('Ordem de serviço não encontrada.');
     }
     return OrdemServicoRespostaDto.de(ordem);
+  }
+
+  @Post(':id/diagnostico')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Registra serviços/peças e conclui o diagnóstico (verifica estoque, cota faltantes, gera orçamento; status → Em diagnóstico)',
+  })
+  async diagnostico(
+    @Param('id') id: string,
+    @Body() dto: RegistrarDiagnosticoDto,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ): Promise<DiagnosticoRespostaDto> {
+    const ordem = await this.registrarDiagnostico.executar({
+      ordemId: id,
+      servicos: dto.servicos,
+      pecas: dto.pecas ?? [],
+      por: usuario.username,
+    });
+    return DiagnosticoRespostaDto.de(ordem);
   }
 }

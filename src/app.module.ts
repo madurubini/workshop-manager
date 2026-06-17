@@ -5,14 +5,15 @@ import { CompartilhadoModule } from './compartilhado/compartilhado.module';
 import { IdentidadeModule } from './identidade/identidade.module';
 import { ClientesVeiculosModule } from './clientes-veiculos/clientes-veiculos.module';
 import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
+import { CatalogoServicosModule } from './catalogo-servicos/catalogo-servicos.module';
+import { EstoqueModule } from './estoque/estoque.module';
 
 /**
  * Composição raiz do monolito modular. Cada contexto delimitado entra como
  * um módulo. O event bus in-process (@nestjs/event-emitter) é registrado aqui
  * e será usado pelas políticas entre módulos a partir da Fase 3.
  *
- * Módulos restantes (estoque, catalogo-servicos, notificacoes) entram nas
- * fases seguintes.
+ * Módulo restante (notificacoes) entra nas fases seguintes.
  */
 @Module({
   imports: [
@@ -21,6 +22,8 @@ import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
     CompartilhadoModule,
     IdentidadeModule,
     ClientesVeiculosModule,
+    CatalogoServicosModule,
+    EstoqueModule,
     OrdemServicoModule,
   ],
 })

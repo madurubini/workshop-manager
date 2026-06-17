@@ -24,6 +24,7 @@ describe('AbrirOrdemServico', () => {
   beforeEach(() => {
     ordens = {
       inserir: jest.fn(),
+      atualizar: jest.fn(),
       buscarPorId: jest.fn(),
       listar: jest.fn(),
       proximoNumero: jest.fn().mockResolvedValue('OS-000001'),

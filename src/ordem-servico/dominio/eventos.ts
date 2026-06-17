@@ -27,3 +27,27 @@ export class StatusOSAlterado extends EventoDominio {
     return 'ordem-servico.status-alterado';
   }
 }
+
+/** Diagnóstico concluído (serviços e peças registrados). */
+export class DiagnosticoConcluido extends EventoDominio {
+  constructor(readonly ordemId: string) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.diagnostico-concluido';
+  }
+}
+
+/** Orçamento gerado a partir do diagnóstico (ainda não enviado). */
+export class OrcamentoGerado extends EventoDominio {
+  constructor(
+    readonly ordemId: string,
+    readonly orcamentoId: string,
+    readonly total: number,
+  ) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.orcamento-gerado';
+  }
+}

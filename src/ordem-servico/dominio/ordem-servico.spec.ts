@@ -1,4 +1,8 @@
-import { ErroTransicaoInvalida } from '../../compartilhado/erros/erros-dominio';
+import {
+  ErroTransicaoInvalida,
+  ErroValidacao,
+} from '../../compartilhado/erros/erros-dominio';
+import { SituacaoItemPeca, StatusOrcamento } from './itens';
 import { OrdemServico } from './ordem-servico';
 import { StatusOS, transicaoPermitida } from './status-os';
 
@@ -93,5 +97,71 @@ describe('Máquina de estados da OS', () => {
     expect(() => os.transicionarPara(StatusOS.EM_DIAGNOSTICO)).toThrow(
       ErroTransicaoInvalida,
     );
+  });
+});
+
+describe('OrdemServico.registrarDiagnostico', () => {
+  const itemServico = {
+    id: 'is1',
+    servicoId: 's1',
+    descricao: 'Troca de óleo',
+    quantidade: 2,
+    precoAplicado: 120,
+    reparoId: null,
+  };
+  const itemPeca = {
+    id: 'ip1',
+    pecaId: 'p1',
+    descricao: 'Filtro',
+    quantidade: 4,
+    precoAplicado: 35,
+    situacao: SituacaoItemPeca.DISPONIVEL,
+    reparoId: null,
+  };
+
+  it('calcula os totais, gera orçamento GERADO e vai para Em diagnóstico', () => {
+    const os = abrirOS();
+    os.puxarEventos();
+    os.registrarDiagnostico({
+      itensServico: [itemServico],
+      itensPeca: [itemPeca],
+      orcamentoId: 'orc-1',
+    });
+
+    expect(os.status).toBe(StatusOS.EM_DIAGNOSTICO);
+    expect(os.orcamento?.totalServicos).toBe(240); // 2 * 120
+    expect(os.orcamento?.totalPecas).toBe(140); // 4 * 35
+    expect(os.orcamento?.total).toBe(380);
+    expect(os.orcamento?.status).toBe(StatusOrcamento.GERADO);
+
+    const nomes = os.puxarEventos().map((e) => e.nomeEvento);
+    expect(nomes).toContain('ordem-servico.status-alterado');
+    expect(nomes).toContain('ordem-servico.diagnostico-concluido');
+    expect(nomes).toContain('ordem-servico.orcamento-gerado');
+  });
+
+  it('exige ao menos um serviço ou peça', () => {
+    const os = abrirOS();
+    expect(() =>
+      os.registrarDiagnostico({
+        itensServico: [],
+        itensPeca: [],
+        orcamentoId: 'orc-1',
+      }),
+    ).toThrow(ErroValidacao);
+    // não pode ter mudado de status
+    expect(os.status).toBe(StatusOS.RECEBIDA);
+  });
+
+  it('não registra diagnóstico se a OS não está em Recebida', () => {
+    const os = abrirOS();
+    os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
+    expect(() =>
+      os.registrarDiagnostico({
+        itensServico: [itemServico],
+        itensPeca: [],
+        orcamentoId: 'orc-1',
+      }),
+    ).toThrow(ErroTransicaoInvalida);
   });
 });

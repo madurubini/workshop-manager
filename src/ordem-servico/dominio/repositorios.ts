@@ -10,6 +10,11 @@ export interface FiltroOrdens {
 
 export interface OrdemServicoRepository {
   inserir(ordem: OrdemServico): Promise<void>;
+  /**
+   * Persiste uma OS já existente com optimistic lock: usa a versão carregada
+   * para detectar escrita concorrente. Lança ErroConflito se a versão mudou.
+   */
+  atualizar(ordem: OrdemServico): Promise<void>;
   buscarPorId(id: string): Promise<OrdemServico | null>;
   listar(filtro?: FiltroOrdens): Promise<OrdemServico[]>;
   /** Gera o próximo número sequencial da OS (ex.: OS-000001). */
