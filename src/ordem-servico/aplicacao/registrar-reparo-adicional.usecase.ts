@@ -12,21 +12,14 @@ import {
 } from '../dominio/repositorios';
 import { MontadorDeItens } from './montador-de-itens.service';
 
-export interface EntradaRegistrarDiagnostico {
-  ordemId: string;
-  servicos: { servicoId: string; quantidade: number }[];
-  pecas: { pecaId: string; quantidade: number }[];
-  por?: string | null;
-}
-
 /**
- * Caso de uso central da Fatia 2. Monta os itens (preços congelados, estoque
- * verificado só em leitura, faltantes cotados) via MontadorDeItens e delega à
- * OS o registro do diagnóstico — que gera o orçamento e leva a OS de Recebida
- * → Em diagnóstico.
+ * Caso de uso: lançar um reparo adicional durante a execução. Reaproveita o
+ * MontadorDeItens (mesmo congelamento de preço e verificação de estoque do
+ * diagnóstico). A OS atualiza o orçamento e emite o evento que pede autorização
+ * ao cliente.
  */
 @Injectable()
-export class RegistrarDiagnostico {
+export class RegistrarReparoAdicional {
   constructor(
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
@@ -35,7 +28,12 @@ export class RegistrarDiagnostico {
     private readonly eventos: PublicadorDeEventos,
   ) {}
 
-  async executar(entrada: EntradaRegistrarDiagnostico): Promise<OrdemServico> {
+  async executar(entrada: {
+    ordemId: string;
+    descricao: string;
+    servicos: { servicoId: string; quantidade: number }[];
+    pecas: { pecaId: string; quantidade: number }[];
+  }): Promise<OrdemServico> {
     const ordem = await this.ordens.buscarPorId(entrada.ordemId);
     if (!ordem) {
       throw new ErroNaoEncontrado('Ordem de serviço não encontrada.', {
@@ -43,17 +41,22 @@ export class RegistrarDiagnostico {
       });
     }
 
-    const itensServico = await this.montador.montarServicos(entrada.servicos);
+    const reparoId = randomUUID();
+    const itensServico = await this.montador.montarServicos(
+      entrada.servicos,
+      reparoId,
+    );
     const itensPeca = await this.montador.montarPecas(
       entrada.ordemId,
       entrada.pecas,
+      reparoId,
     );
 
-    ordem.registrarDiagnostico({
+    ordem.adicionarReparo({
+      id: reparoId,
+      descricao: entrada.descricao,
       itensServico,
       itensPeca,
-      orcamentoId: randomUUID(),
-      por: entrada.por,
     });
 
     await this.ordens.atualizar(ordem);

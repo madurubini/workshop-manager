@@ -267,3 +267,153 @@ describe('Ciclo de vida do orçamento na OS', () => {
     expect(() => os.aprovarOrcamento()).toThrow(ErroTransicaoInvalida);
   });
 });
+
+describe('Execução e reparo adicional', () => {
+  const itemServico = {
+    id: 'is1',
+    servicoId: 's1',
+    descricao: 'Serviço',
+    quantidade: 1,
+    precoAplicado: 100,
+    reparoId: null,
+  };
+  const itemPeca = {
+    id: 'ip1',
+    pecaId: 'p1',
+    descricao: 'Filtro',
+    quantidade: 2,
+    precoAplicado: 35,
+    situacao: SituacaoItemPeca.DISPONIVEL,
+    reparoId: null,
+  };
+
+  function osEmExecucao(): OrdemServico {
+    const os = abrirOS();
+    os.registrarDiagnostico({
+      itensServico: [itemServico],
+      itensPeca: [itemPeca],
+      orcamentoId: 'orc-1',
+    });
+    os.enviarOrcamento();
+    os.aprovarOrcamento('cliente');
+    os.puxarEventos();
+    return os;
+  }
+
+  it('marca o início da execução ao aprovar', () => {
+    const os = osEmExecucao();
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(os.iniciadoExecucaoEm).toBeInstanceOf(Date);
+  });
+
+  it('concluir: registra fim, vai para Finalizada e emite execucao-concluida', () => {
+    const os = osEmExecucao();
+    os.concluirExecucao('mecanico');
+    expect(os.status).toBe(StatusOS.FINALIZADA);
+    expect(os.finalizadoEm).toBeInstanceOf(Date);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.execucao-concluida',
+    );
+  });
+
+  it('lançar reparo: atualiza o orçamento e fica AGUARDANDO', () => {
+    const os = osEmExecucao();
+    const totalAntes = os.orcamento!.total; // 100 + 70 = 170
+    os.adicionarReparo({
+      id: 'rep-1',
+      descricao: 'Correia',
+      itensServico: [
+        {
+          id: 'is2',
+          servicoId: 's2',
+          descricao: 'Troca correia',
+          quantidade: 1,
+          precoAplicado: 80,
+          reparoId: null,
+        },
+      ],
+      itensPeca: [],
+    });
+    expect(os.reparos).toHaveLength(1);
+    expect(os.orcamento!.total).toBe(totalAntes + 80);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.reparo-adicional-lancado',
+    );
+  });
+
+  it('não conclui execução com reparo aguardando', () => {
+    const os = osEmExecucao();
+    os.adicionarReparo({
+      id: 'rep-1',
+      descricao: 'X',
+      itensServico: [
+        {
+          id: 'is2',
+          servicoId: 's2',
+          descricao: 'X',
+          quantidade: 1,
+          precoAplicado: 80,
+          reparoId: null,
+        },
+      ],
+      itensPeca: [],
+    });
+    expect(() => os.concluirExecucao()).toThrow(ErroValidacao);
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+  });
+
+  it('recusar reparo: remove seus itens e volta o total; depois conclui', () => {
+    const os = osEmExecucao();
+    const totalAntes = os.orcamento!.total;
+    os.adicionarReparo({
+      id: 'rep-1',
+      descricao: 'X',
+      itensServico: [
+        {
+          id: 'is2',
+          servicoId: 's2',
+          descricao: 'X',
+          quantidade: 1,
+          precoAplicado: 80,
+          reparoId: null,
+        },
+      ],
+      itensPeca: [],
+    });
+    os.recusarReparo('rep-1');
+    expect(os.orcamento!.total).toBe(totalAntes);
+    expect(os.itensServico.filter((i) => i.reparoId === 'rep-1')).toHaveLength(
+      0,
+    );
+    // sem reparo pendente, agora conclui
+    os.concluirExecucao();
+    expect(os.status).toBe(StatusOS.FINALIZADA);
+  });
+
+  it('aprovar reparo: peças do reparo viram RESERVADA e emite reparo-aprovado', () => {
+    const os = osEmExecucao();
+    os.adicionarReparo({
+      id: 'rep-1',
+      descricao: 'X',
+      itensServico: [],
+      itensPeca: [
+        {
+          id: 'ip2',
+          pecaId: 'p2',
+          descricao: 'Correia',
+          quantidade: 1,
+          precoAplicado: 50,
+          situacao: SituacaoItemPeca.DISPONIVEL,
+          reparoId: null,
+        },
+      ],
+    });
+    os.puxarEventos();
+    os.aprovarReparo('rep-1');
+    const itemReparo = os.itensPeca.find((i) => i.reparoId === 'rep-1');
+    expect(itemReparo?.situacao).toBe(SituacaoItemPeca.RESERVADA);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.reparo-aprovado',
+    );
+  });
+});

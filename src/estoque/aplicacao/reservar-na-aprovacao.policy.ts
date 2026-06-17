@@ -1,7 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-// Importação SÓ DE TIPO: o contrato do evento, sem acoplar ao módulo de OS.
-import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
+// Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
+import type {
+  OrcamentoAprovado,
+  ReparoAprovado,
+} from '../../ordem-servico/dominio/eventos';
 import { FORNECEDOR, Fornecedor } from '../dominio/fornecedor';
 import {
   PECA_REPOSITORY,
@@ -30,8 +33,21 @@ export class ReservarNaAprovacao {
   ) {}
 
   @OnEvent('ordem-servico.orcamento-aprovado')
-  async tratar(evento: OrcamentoAprovado): Promise<void> {
-    for (const item of evento.itensPeca) {
+  async aoAprovarOrcamento(evento: OrcamentoAprovado): Promise<void> {
+    await this.reservarOuEncomendar(evento.ordemId, evento.itensPeca);
+  }
+
+  // Reparo aprovado reserva/encomenda exatamente como a aprovação do orçamento.
+  @OnEvent('ordem-servico.reparo-aprovado')
+  async aoAprovarReparo(evento: ReparoAprovado): Promise<void> {
+    await this.reservarOuEncomendar(evento.ordemId, evento.itensPeca);
+  }
+
+  private async reservarOuEncomendar(
+    ordemId: string,
+    itensPeca: OrcamentoAprovado['itensPeca'],
+  ): Promise<void> {
+    for (const item of itensPeca) {
       const peca = await this.pecas.buscarPorId(item.pecaId);
       if (!peca) {
         this.logger.warn(`Peça ${item.pecaId} não encontrada ao reservar.`);
@@ -47,13 +63,13 @@ export class ReservarNaAprovacao {
         await this.pecas.salvar(peca);
         await this.reservas.registrar({
           pecaId: item.pecaId,
-          ordemId: evento.ordemId,
+          ordemId,
           quantidade: item.quantidade,
           status: 'RESERVADA',
         });
       } else {
         await this.fornecedor.encomendar({
-          ordemId: evento.ordemId,
+          ordemId,
           pecaId: item.pecaId,
           quantidade: item.quantidade,
         });

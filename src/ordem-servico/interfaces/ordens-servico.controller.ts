@@ -21,8 +21,10 @@ import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
 import { UsuarioAtual } from '../../identidade/interfaces/usuario-atual.decorator';
 import { UsuarioAutenticado } from '../../identidade/infraestrutura/jwt.strategy';
 import { AbrirOrdemServico } from '../aplicacao/abrir-ordem-servico.usecase';
+import { ConcluirExecucao } from '../aplicacao/concluir-execucao.usecase';
 import { EnviarOrcamento } from '../aplicacao/enviar-orcamento.usecase';
 import { RegistrarDiagnostico } from '../aplicacao/registrar-diagnostico.usecase';
+import { RegistrarReparoAdicional } from '../aplicacao/registrar-reparo-adicional.usecase';
 import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
@@ -33,6 +35,7 @@ import {
   DiagnosticoRespostaDto,
   OrdemServicoRespostaDto,
   RegistrarDiagnosticoDto,
+  RegistrarReparoAdicionalDto,
 } from './dtos';
 
 @ApiTags('Ordens de Serviço')
@@ -44,6 +47,8 @@ export class OrdensServicoController {
     private readonly abrirOrdemServico: AbrirOrdemServico,
     private readonly registrarDiagnostico: RegistrarDiagnostico,
     private readonly enviarOrcamento: EnviarOrcamento,
+    private readonly concluirExecucao: ConcluirExecucao,
+    private readonly registrarReparoAdicional: RegistrarReparoAdicional,
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
   ) {}
@@ -117,6 +122,42 @@ export class OrdensServicoController {
     const ordem = await this.enviarOrcamento.executar({
       ordemId: id,
       por: usuario.username,
+    });
+    return OrdemServicoRespostaDto.de(ordem);
+  }
+
+  @Post(':id/execucao/concluir')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Conclui a execução (baixa peças reservadas, registra tempo; → Finalizada)',
+  })
+  async concluir(
+    @Param('id') id: string,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ): Promise<OrdemServicoRespostaDto> {
+    const ordem = await this.concluirExecucao.executar({
+      ordemId: id,
+      por: usuario.username,
+    });
+    return OrdemServicoRespostaDto.de(ordem);
+  }
+
+  @Post(':id/reparos-adicionais')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary:
+      'Lança um reparo adicional (atualiza o orçamento, notifica o cliente)',
+  })
+  async lancarReparo(
+    @Param('id') id: string,
+    @Body() dto: RegistrarReparoAdicionalDto,
+  ): Promise<OrdemServicoRespostaDto> {
+    const ordem = await this.registrarReparoAdicional.executar({
+      ordemId: id,
+      descricao: dto.descricao,
+      servicos: dto.servicos ?? [],
+      pecas: dto.pecas ?? [],
     });
     return OrdemServicoRespostaDto.de(ordem);
   }

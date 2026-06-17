@@ -5,6 +5,7 @@ import type {
   OrcamentoAprovado,
   OrcamentoEnviado,
   OrcamentoRecusado,
+  ReparoAdicionalLancado,
 } from '../../ordem-servico/dominio/eventos';
 import { NOTIFICADOR, Notificador } from '../dominio/notificador';
 
@@ -44,6 +45,16 @@ export class NotificarCliente {
       ordemId: evento.ordemId,
       tipo: 'ORCAMENTO_RECUSADO',
       mensagem: 'Orçamento recusado. A OS foi cancelada.',
+    });
+  }
+
+  @OnEvent('ordem-servico.reparo-adicional-lancado')
+  async aoLancarReparo(evento: ReparoAdicionalLancado): Promise<void> {
+    await this.notificador.notificar({
+      ordemId: evento.ordemId,
+      tipo: 'REPARO_LANCADO',
+      mensagem:
+        'Identificamos um reparo adicional. Autorize ou recuse pelo aplicativo.',
     });
   }
 }

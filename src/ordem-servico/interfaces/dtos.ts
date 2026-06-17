@@ -208,6 +208,33 @@ export class RespostaOrcamentoDto {
   justificativa?: string;
 }
 
+export class RegistrarReparoAdicionalDto {
+  @ApiProperty({ example: 'Troca da correia dentada (desgaste detectado)' })
+  @IsString()
+  @IsNotEmpty()
+  descricao!: string;
+
+  @ApiProperty({ type: [ItemServicoEntradaDto], required: false })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItemServicoEntradaDto)
+  servicos?: ItemServicoEntradaDto[];
+
+  @ApiProperty({ type: [ItemPecaEntradaDto], required: false })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItemPecaEntradaDto)
+  pecas?: ItemPecaEntradaDto[];
+}
+
+export class RespostaReparoDto {
+  @ApiProperty({ description: 'true autoriza, false recusa o reparo' })
+  @IsBoolean()
+  aprovado!: boolean;
+}
+
 /** Resposta do diagnóstico no formato do contrato. */
 export class DiagnosticoRespostaDto {
   @ApiProperty({ example: 'Em diagnóstico' }) status!: string;

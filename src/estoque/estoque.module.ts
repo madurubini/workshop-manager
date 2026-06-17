@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ESTOQUE_API } from './aplicacao/estoque.api';
 import { EstoqueApiService } from './aplicacao/estoque-api.service';
+import { BaixarNaConclusao } from './aplicacao/baixar-na-conclusao.policy';
 import { ReservarNaAprovacao } from './aplicacao/reservar-na-aprovacao.policy';
 import { FORNECEDOR } from './dominio/fornecedor';
 import {
@@ -27,6 +28,7 @@ import { PrismaReservaRepository } from './infraestrutura/prisma-reserva.reposit
     { provide: FORNECEDOR, useClass: FornecedorSimulado },
     { provide: ESTOQUE_API, useClass: EstoqueApiService },
     ReservarNaAprovacao,
+    BaixarNaConclusao,
   ],
   exports: [ESTOQUE_API],
 })

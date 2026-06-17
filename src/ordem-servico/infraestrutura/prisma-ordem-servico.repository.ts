@@ -6,10 +6,15 @@ import {
   Orcamento as OrcamentoPrisma,
   OrdemServico as OrdemPrisma,
   Prisma,
+  ReparoAdicional as ReparoPrisma,
 } from '@prisma/client';
 import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
 import { ErroConflito } from '../../compartilhado/erros/erros-dominio';
-import { SituacaoItemPeca, StatusOrcamento } from '../dominio/itens';
+import {
+  SituacaoItemPeca,
+  StatusOrcamento,
+  StatusReparo,
+} from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { FiltroOrdens, OrdemServicoRepository } from '../dominio/repositorios';
 import { StatusOS } from '../dominio/status-os';
@@ -18,6 +23,7 @@ type OrdemCompleta = OrdemPrisma & {
   historico: HistoricoPrisma[];
   itensServico: ItemServicoPrisma[];
   itensPeca: ItemPecaPrisma[];
+  reparos: ReparoPrisma[];
   orcamento: OrcamentoPrisma | null;
 };
 
@@ -25,6 +31,7 @@ const INCLUDE_COMPLETO = {
   historico: { orderBy: { em: 'asc' } },
   itensServico: true,
   itensPeca: true,
+  reparos: true,
   orcamento: true,
 } as const;
 
@@ -67,6 +74,8 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         data: {
           status: ordem.status,
           pago: ordem.pago,
+          iniciadoExecucaoEm: ordem.iniciadoExecucaoEm,
+          finalizadoEm: ordem.finalizadoEm,
           versao: ordem.versao + 1,
         },
       });
@@ -77,8 +86,14 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         );
       }
 
-      // O agregado é a fonte de verdade: regrava histórico, itens e orçamento.
+      // O agregado é a fonte de verdade: regrava histórico, itens, reparos e
+      // orçamento. Apaga os itens (filhos) antes dos reparos (pais) por causa
+      // da FK reparoId; recria os reparos antes dos itens.
       await tx.historicoStatus.deleteMany({ where: { ordemId: ordem.id } });
+      await tx.itemServico.deleteMany({ where: { ordemId: ordem.id } });
+      await tx.itemPeca.deleteMany({ where: { ordemId: ordem.id } });
+      await tx.reparoAdicional.deleteMany({ where: { ordemId: ordem.id } });
+
       await tx.historicoStatus.createMany({
         data: ordem.historico.map((h) => ({
           ordemId: ordem.id,
@@ -88,7 +103,20 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         })),
       });
 
-      await tx.itemServico.deleteMany({ where: { ordemId: ordem.id } });
+      if (ordem.reparos.length > 0) {
+        await tx.reparoAdicional.createMany({
+          data: ordem.reparos.map((r) => ({
+            id: r.id,
+            ordemId: ordem.id,
+            descricao: r.descricao,
+            total: r.total,
+            status: r.status,
+            criadoEm: r.criadoEm,
+            respondidoEm: r.respondidoEm,
+          })),
+        });
+      }
+
       if (ordem.itensServico.length > 0) {
         await tx.itemServico.createMany({
           data: ordem.itensServico.map((i) => ({
@@ -103,7 +131,6 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         });
       }
 
-      await tx.itemPeca.deleteMany({ where: { ordemId: ordem.id } });
       if (ordem.itensPeca.length > 0) {
         await tx.itemPeca.createMany({
           data: ordem.itensPeca.map((i) => ({
@@ -185,6 +212,8 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
       versao: r.versao,
       pago: r.pago,
       criadoEm: r.criadoEm,
+      iniciadoExecucaoEm: r.iniciadoExecucaoEm,
+      finalizadoEm: r.finalizadoEm,
       historico: r.historico.map((h) => ({
         status: h.status as StatusOS,
         em: h.em,
@@ -206,6 +235,14 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         precoAplicado: Number(i.precoAplicado),
         situacao: i.situacao as SituacaoItemPeca,
         reparoId: i.reparoId,
+      })),
+      reparos: r.reparos.map((rep) => ({
+        id: rep.id,
+        descricao: rep.descricao,
+        total: Number(rep.total),
+        status: rep.status as StatusReparo,
+        criadoEm: rep.criadoEm,
+        respondidoEm: rep.respondidoEm,
       })),
       orcamento: r.orcamento
         ? {

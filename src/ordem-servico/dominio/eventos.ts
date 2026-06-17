@@ -107,3 +107,56 @@ export class OrcamentoRecusado extends EventoDominio {
     return 'ordem-servico.orcamento-recusado';
   }
 }
+
+/** Execução concluída (→ estoque baixa as peças reservadas). */
+export class ExecucaoConcluida extends EventoDominio {
+  constructor(
+    readonly ordemId: string,
+    readonly tempoExecucaoMin: number | null,
+  ) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.execucao-concluida';
+  }
+}
+
+/** Reparo adicional lançado (→ notificacoes pede autorização ao cliente). */
+export class ReparoAdicionalLancado extends EventoDominio {
+  constructor(
+    readonly ordemId: string,
+    readonly reparoId: string,
+  ) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.reparo-adicional-lancado';
+  }
+}
+
+/** Reparo aprovado (→ estoque reserva/encomenda as peças do reparo). */
+export class ReparoAprovado extends EventoDominio {
+  constructor(
+    readonly ordemId: string,
+    readonly reparoId: string,
+    readonly itensPeca: ItemPecaAprovado[],
+  ) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.reparo-aprovado';
+  }
+}
+
+/** Reparo recusado (→ segue só com o que foi aprovado). */
+export class ReparoRecusado extends EventoDominio {
+  constructor(
+    readonly ordemId: string,
+    readonly reparoId: string,
+  ) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.reparo-recusado';
+  }
+}

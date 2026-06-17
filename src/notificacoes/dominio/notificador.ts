@@ -9,7 +9,9 @@ export type TipoNotificacao =
   | 'ORCAMENTO_ENVIADO'
   | 'ORCAMENTO_APROVADO'
   | 'ORCAMENTO_RECUSADO'
-  | 'LEMBRETE_APROVACAO';
+  | 'LEMBRETE_APROVACAO'
+  | 'REPARO_LANCADO'
+  | 'LEMBRETE_REPARO';
 
 export interface Notificador {
   notificar(entrada: {

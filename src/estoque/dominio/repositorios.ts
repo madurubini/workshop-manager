@@ -26,6 +26,8 @@ export interface ReservaRepository {
   registrar(dados: DadosReserva): Promise<void>;
   /** Reservas RESERVADA de uma OS (usado na baixa, Fase 6). */
   listarReservadasDaOrdem(ordemId: string): Promise<DadosReserva[]>;
+  /** Marca como BAIXADA todas as reservas RESERVADA de uma OS. */
+  marcarBaixadasDaOrdem(ordemId: string): Promise<void>;
 }
 
 export interface DadosCotacao {

@@ -34,4 +34,11 @@ export class PrismaReservaRepository implements ReservaRepository {
       status: r.status as StatusReserva,
     }));
   }
+
+  async marcarBaixadasDaOrdem(ordemId: string): Promise<void> {
+    await this.prisma.reservaEstoque.updateMany({
+      where: { ordemId, status: 'RESERVADA' },
+      data: { status: 'BAIXADA' },
+    });
+  }
 }

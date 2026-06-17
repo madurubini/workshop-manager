@@ -1,16 +1,21 @@
 import { AgregadoRaiz } from '../../compartilhado/dominio/agregado-raiz';
 import {
+  ErroNaoEncontrado,
   ErroTransicaoInvalida,
   ErroValidacao,
 } from '../../compartilhado/erros/erros-dominio';
 import {
   DiagnosticoConcluido,
+  ExecucaoConcluida,
   ItemPecaAprovado,
   OrcamentoAprovado,
   OrcamentoEnviado,
   OrcamentoGerado,
   OrcamentoRecusado,
   OSAberta,
+  ReparoAdicionalLancado,
+  ReparoAprovado,
+  ReparoRecusado,
   StatusOSAlterado,
 } from './eventos';
 import {
@@ -18,8 +23,10 @@ import {
   ItemPeca,
   ItemServico,
   Orcamento,
+  ReparoAdicional,
   SituacaoItemPeca,
   StatusOrcamento,
+  StatusReparo,
 } from './itens';
 import { StatusOS, transicaoPermitida } from './status-os';
 
@@ -38,9 +45,12 @@ interface PropsOrdemServico {
   versao: number;
   pago: boolean;
   criadoEm: Date;
+  iniciadoExecucaoEm: Date | null;
+  finalizadoEm: Date | null;
   historico: RegistroHistorico[];
   itensServico: ItemServico[];
   itensPeca: ItemPeca[];
+  reparos: ReparoAdicional[];
   orcamento: Orcamento | null;
 }
 
@@ -81,11 +91,14 @@ export class OrdemServico extends AgregadoRaiz<string> {
       versao: 0,
       pago: false,
       criadoEm: agora,
+      iniciadoExecucaoEm: null,
+      finalizadoEm: null,
       historico: [
         { status: StatusOS.RECEBIDA, em: agora, por: entrada.por ?? null },
       ],
       itensServico: [],
       itensPeca: [],
+      reparos: [],
       orcamento: null,
     });
     os.registrarEvento(new OSAberta(os.id, os.numero));
@@ -212,6 +225,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
           : SituacaoItemPeca.ENCOMENDADA;
     }
 
+    this.props.iniciadoExecucaoEm = new Date();
     this.transicionarPara(StatusOS.EM_EXECUCAO, por);
     this.registrarEvento(new OrcamentoAprovado(this.id, itensParaEstoque));
   }
@@ -225,6 +239,115 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(new OrcamentoRecusado(this.id, justificativa ?? null));
   }
 
+  /**
+   * Mecânico conclui a execução. Bloqueia se houver reparo aguardando resposta
+   * (regra: só finaliza sem reparo pendente). Registra o tempo e leva a OS para
+   * Finalizada; o evento dispara a baixa do estoque das peças reservadas.
+   */
+  concluirExecucao(por?: string | null): void {
+    if (this.temReparoPendente()) {
+      throw new ErroValidacao(
+        'Há reparo adicional aguardando resposta do cliente; não é possível concluir.',
+      );
+    }
+    this.props.finalizadoEm = new Date();
+    this.transicionarPara(StatusOS.FINALIZADA, por);
+    this.registrarEvento(
+      new ExecucaoConcluida(this.id, this.tempoExecucaoMinutos()),
+    );
+  }
+
+  /**
+   * Lança um reparo adicional durante a execução (itens com preço já congelado
+   * pela aplicação). Atualiza o orçamento e emite o evento que pede autorização
+   * ao cliente. A OS continua Em execução; o reparo nasce AGUARDANDO.
+   */
+  adicionarReparo(entrada: {
+    id: string;
+    descricao: string;
+    itensServico: ItemServico[];
+    itensPeca: ItemPeca[];
+  }): void {
+    if (this.props.status !== StatusOS.EM_EXECUCAO) {
+      throw new ErroTransicaoInvalida(
+        'Reparo adicional só pode ser lançado com a OS em execução.',
+      );
+    }
+    if (entrada.itensServico.length === 0 && entrada.itensPeca.length === 0) {
+      throw new ErroValidacao('Reparo precisa de ao menos um serviço ou peça.');
+    }
+
+    const itensServico = entrada.itensServico.map((i) => ({
+      ...i,
+      reparoId: entrada.id,
+    }));
+    const itensPeca = entrada.itensPeca.map((i) => ({
+      ...i,
+      reparoId: entrada.id,
+    }));
+    const total = arredondar2(
+      [...itensServico, ...itensPeca].reduce(
+        (soma, i) => soma + i.precoAplicado * i.quantidade,
+        0,
+      ),
+    );
+
+    this.props.reparos.push({
+      id: entrada.id,
+      descricao: entrada.descricao,
+      total,
+      status: StatusReparo.AGUARDANDO,
+      criadoEm: new Date(),
+      respondidoEm: null,
+    });
+    this.props.itensServico.push(...itensServico);
+    this.props.itensPeca.push(...itensPeca);
+    this.recalcularOrcamento();
+
+    this.registrarEvento(new ReparoAdicionalLancado(this.id, entrada.id));
+  }
+
+  /** Cliente aprova o reparo: peças do reparo viram reservada/encomendada. */
+  aprovarReparo(reparoId: string): void {
+    const reparo = this.reparoNoEstado(reparoId, StatusReparo.AGUARDANDO);
+    const itensDoReparo = this.props.itensPeca.filter(
+      (i) => i.reparoId === reparoId,
+    );
+    const payload: ItemPecaAprovado[] = itensDoReparo.map((i) => ({
+      pecaId: i.pecaId,
+      quantidade: i.quantidade,
+      situacao:
+        i.situacao === SituacaoItemPeca.DISPONIVEL
+          ? 'DISPONIVEL'
+          : 'EM_COTACAO',
+    }));
+
+    reparo.status = StatusReparo.APROVADO;
+    reparo.respondidoEm = new Date();
+    for (const item of itensDoReparo) {
+      item.situacao =
+        item.situacao === SituacaoItemPeca.DISPONIVEL
+          ? SituacaoItemPeca.RESERVADA
+          : SituacaoItemPeca.ENCOMENDADA;
+    }
+    this.registrarEvento(new ReparoAprovado(this.id, reparoId, payload));
+  }
+
+  /** Cliente recusa o reparo: remove seus itens e segue só com o aprovado. */
+  recusarReparo(reparoId: string): void {
+    const reparo = this.reparoNoEstado(reparoId, StatusReparo.AGUARDANDO);
+    reparo.status = StatusReparo.RECUSADO;
+    reparo.respondidoEm = new Date();
+    this.props.itensServico = this.props.itensServico.filter(
+      (i) => i.reparoId !== reparoId,
+    );
+    this.props.itensPeca = this.props.itensPeca.filter(
+      (i) => i.reparoId !== reparoId,
+    );
+    this.recalcularOrcamento();
+    this.registrarEvento(new ReparoRecusado(this.id, reparoId));
+  }
+
   /** Garante que existe orçamento e que ele está no estado esperado. */
   private orcamentoNoEstado(esperado: StatusOrcamento): Orcamento {
     if (!this.props.orcamento) {
@@ -236,6 +359,60 @@ export class OrdemServico extends AgregadoRaiz<string> {
       );
     }
     return this.props.orcamento;
+  }
+
+  private reparoNoEstado(
+    reparoId: string,
+    esperado: StatusReparo,
+  ): ReparoAdicional {
+    const reparo = this.props.reparos.find((r) => r.id === reparoId);
+    if (!reparo) {
+      throw new ErroNaoEncontrado('Reparo adicional não encontrado.', {
+        reparoId,
+      });
+    }
+    if (reparo.status !== esperado) {
+      throw new ErroTransicaoInvalida(
+        `Reparo precisa estar ${esperado}; está ${reparo.status}.`,
+      );
+    }
+    return reparo;
+  }
+
+  private temReparoPendente(): boolean {
+    return this.props.reparos.some((r) => r.status === StatusReparo.AGUARDANDO);
+  }
+
+  /** Recalcula os totais do orçamento a partir de todos os itens atuais. */
+  private recalcularOrcamento(): void {
+    if (!this.props.orcamento) {
+      return;
+    }
+    const totalServicos = arredondar2(
+      this.props.itensServico.reduce(
+        (soma, i) => soma + i.precoAplicado * i.quantidade,
+        0,
+      ),
+    );
+    const totalPecas = arredondar2(
+      this.props.itensPeca.reduce(
+        (soma, i) => soma + i.precoAplicado * i.quantidade,
+        0,
+      ),
+    );
+    this.props.orcamento.totalServicos = totalServicos;
+    this.props.orcamento.totalPecas = totalPecas;
+    this.props.orcamento.total = arredondar2(totalServicos + totalPecas);
+  }
+
+  private tempoExecucaoMinutos(): number | null {
+    if (!this.props.iniciadoExecucaoEm || !this.props.finalizadoEm) {
+      return null;
+    }
+    const ms =
+      this.props.finalizadoEm.getTime() -
+      this.props.iniciadoExecucaoEm.getTime();
+    return Math.round(ms / 60000);
   }
 
   get numero(): string {
@@ -271,7 +448,16 @@ export class OrdemServico extends AgregadoRaiz<string> {
   get itensPeca(): readonly ItemPeca[] {
     return this.props.itensPeca;
   }
+  get reparos(): readonly ReparoAdicional[] {
+    return this.props.reparos;
+  }
   get orcamento(): Orcamento | null {
     return this.props.orcamento;
+  }
+  get iniciadoExecucaoEm(): Date | null {
+    return this.props.iniciadoExecucaoEm;
+  }
+  get finalizadoEm(): Date | null {
+    return this.props.finalizadoEm;
   }
 }

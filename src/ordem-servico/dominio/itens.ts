@@ -39,6 +39,26 @@ export enum StatusOrcamento {
   RECUSADO = 'RECUSADO',
 }
 
+export enum StatusReparo {
+  AGUARDANDO = 'AGUARDANDO',
+  APROVADO = 'APROVADO',
+  RECUSADO = 'RECUSADO',
+}
+
+/**
+ * Reparo adicional: serviço/peça identificado DURANTE a execução, que precisa
+ * de nova autorização do cliente. Seus itens vivem em itensServico/itensPeca
+ * com `reparoId` apontando para este reparo.
+ */
+export interface ReparoAdicional {
+  id: string;
+  descricao: string;
+  total: number;
+  status: StatusReparo;
+  criadoEm: Date;
+  respondidoEm: Date | null;
+}
+
 export interface Orcamento {
   id: string;
   totalServicos: number;

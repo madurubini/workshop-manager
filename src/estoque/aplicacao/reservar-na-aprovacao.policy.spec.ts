@@ -29,7 +29,11 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       buscarPorCodigo: jest.fn(),
       listar: jest.fn(),
     };
-    reservas = { registrar: jest.fn(), listarReservadasDaOrdem: jest.fn() };
+    reservas = {
+      registrar: jest.fn(),
+      listarReservadasDaOrdem: jest.fn(),
+      marcarBaixadasDaOrdem: jest.fn(),
+    };
     fornecedor = { cotar: jest.fn(), encomendar: jest.fn() };
     policy = new ReservarNaAprovacao(pecas, reservas, fornecedor);
   });
@@ -43,7 +47,7 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       itensPeca: [{ pecaId: 'p1', quantidade: 4, situacao: 'DISPONIVEL' }],
     } as OrcamentoAprovado;
 
-    await policy.tratar(evento);
+    await policy.aoAprovarOrcamento(evento);
 
     expect(p.reservado).toBe(4);
     expect(pecas.salvar).toHaveBeenCalledWith(p);
@@ -64,7 +68,7 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       itensPeca: [{ pecaId: 'p1', quantidade: 2, situacao: 'EM_COTACAO' }],
     } as OrcamentoAprovado;
 
-    await policy.tratar(evento);
+    await policy.aoAprovarOrcamento(evento);
 
     expect(fornecedor.encomendar).toHaveBeenCalledWith({
       ordemId: 'os-1',
@@ -82,7 +86,7 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       itensPeca: [{ pecaId: 'p1', quantidade: 4, situacao: 'DISPONIVEL' }],
     } as OrcamentoAprovado;
 
-    await policy.tratar(evento);
+    await policy.aoAprovarOrcamento(evento);
 
     expect(reservas.registrar).not.toHaveBeenCalled();
     expect(fornecedor.encomendar).toHaveBeenCalled();

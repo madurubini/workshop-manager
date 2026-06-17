@@ -54,27 +54,33 @@ describe('ReenviarPendentes (cliente sem resposta)', () => {
   let policy: ReenviarPendentes;
 
   beforeEach(() => {
-    consulta = { listarAguardandoResposta: jest.fn() };
+    consulta = {
+      listarAguardandoResposta: jest.fn().mockResolvedValue([]),
+      listarReparosAguardando: jest.fn().mockResolvedValue([]),
+    };
     notificador = { notificar: jest.fn() };
     policy = new ReenviarPendentes(consulta, notificador);
   });
 
-  it('reenvia lembrete para cada OS aguardando resposta', async () => {
+  it('reenvia lembrete para orçamentos e reparos aguardando', async () => {
     consulta.listarAguardandoResposta.mockResolvedValue([
       { ordemId: 'os-1', numero: 'OS-1' },
-      { ordemId: 'os-2', numero: 'OS-2' },
+    ]);
+    consulta.listarReparosAguardando.mockResolvedValue([
+      { ordemId: 'os-2', numero: 'OS-2', reparoId: 'rep-1' },
     ]);
 
     await policy.reenviar();
 
-    expect(notificador.notificar).toHaveBeenCalledTimes(2);
     expect(notificador.notificar).toHaveBeenCalledWith(
       expect.objectContaining({ tipo: 'LEMBRETE_APROVACAO' }),
+    );
+    expect(notificador.notificar).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: 'LEMBRETE_REPARO' }),
     );
   });
 
   it('não faz nada quando não há pendências', async () => {
-    consulta.listarAguardandoResposta.mockResolvedValue([]);
     await policy.reenviar();
     expect(notificador.notificar).not.toHaveBeenCalled();
   });

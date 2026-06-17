@@ -24,19 +24,27 @@ export class ReenviarPendentes {
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async reenviar(): Promise<void> {
-    const pendentes = await this.consulta.listarAguardandoResposta();
-    if (pendentes.length === 0) {
-      return;
-    }
-    this.logger.log(
-      `Reenviando lembrete para ${pendentes.length} OS aguardando resposta.`,
-    );
-    for (const os of pendentes) {
+    const orcamentos = await this.consulta.listarAguardandoResposta();
+    for (const os of orcamentos) {
       await this.notificador.notificar({
         ordemId: os.ordemId,
         tipo: 'LEMBRETE_APROVACAO',
         mensagem: `Lembrete: o orçamento da OS ${os.numero} aguarda sua aprovação.`,
       });
+    }
+
+    const reparos = await this.consulta.listarReparosAguardando();
+    for (const r of reparos) {
+      await this.notificador.notificar({
+        ordemId: r.ordemId,
+        tipo: 'LEMBRETE_REPARO',
+        mensagem: `Lembrete: o reparo adicional da OS ${r.numero} aguarda sua autorização.`,
+      });
+    }
+
+    const total = orcamentos.length + reparos.length;
+    if (total > 0) {
+      this.logger.log(`Reenviado lembrete para ${total} pendência(s).`);
     }
   }
 }
