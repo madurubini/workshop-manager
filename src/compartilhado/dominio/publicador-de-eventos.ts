@@ -9,6 +9,11 @@ import { EventoDominio } from './evento-dominio';
 export const PUBLICADOR_DE_EVENTOS = Symbol('PublicadorDeEventos');
 
 export interface PublicadorDeEventos {
-  /** Publica um ou mais eventos já ocorridos (após o sucesso da operação). */
-  publicar(...eventos: EventoDominio[]): void;
+  /**
+   * Publica um ou mais eventos já ocorridos (após o sucesso da operação).
+   * É assíncrono e AGUARDA os assinantes: assim um efeito disparado por
+   * política (ex.: reservar estoque ao aprovar o orçamento) se completa
+   * dentro da mesma operação, de forma consistente.
+   */
+  publicar(...eventos: EventoDominio[]): Promise<void>;
 }

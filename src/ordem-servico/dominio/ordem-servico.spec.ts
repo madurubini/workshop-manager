@@ -165,3 +165,105 @@ describe('OrdemServico.registrarDiagnostico', () => {
     ).toThrow(ErroTransicaoInvalida);
   });
 });
+
+describe('Ciclo de vida do orçamento na OS', () => {
+  const itemServico = {
+    id: 'is1',
+    servicoId: 's1',
+    descricao: 'Serviço',
+    quantidade: 1,
+    precoAplicado: 100,
+    reparoId: null,
+  };
+  const pecaDisponivel = {
+    id: 'ip1',
+    pecaId: 'p1',
+    descricao: 'Filtro',
+    quantidade: 2,
+    precoAplicado: 35,
+    situacao: SituacaoItemPeca.DISPONIVEL,
+    reparoId: null,
+  };
+  const pecaCotada = {
+    id: 'ip2',
+    pecaId: 'p2',
+    descricao: 'Pastilha',
+    quantidade: 1,
+    precoAplicado: 198,
+    situacao: SituacaoItemPeca.EM_COTACAO,
+    reparoId: null,
+  };
+
+  function osComOrcamento(): OrdemServico {
+    const os = abrirOS();
+    os.registrarDiagnostico({
+      itensServico: [itemServico],
+      itensPeca: [pecaDisponivel, pecaCotada],
+      orcamentoId: 'orc-1',
+    });
+    os.puxarEventos();
+    return os;
+  }
+
+  it('enviar: GERADO → ENVIADO e OS → Aguardando aprovação', () => {
+    const os = osComOrcamento();
+    os.enviarOrcamento('recepcionista');
+    expect(os.status).toBe(StatusOS.AGUARDANDO_APROVACAO);
+    expect(os.orcamento?.status).toBe(StatusOrcamento.ENVIADO);
+    expect(os.orcamento?.enviadoEm).toBeInstanceOf(Date);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.orcamento-enviado',
+    );
+  });
+
+  it('não envia se o orçamento não está GERADO', () => {
+    const os = osComOrcamento();
+    os.enviarOrcamento();
+    expect(() => os.enviarOrcamento()).toThrow(ErroTransicaoInvalida);
+  });
+
+  it('aprovar: ENVIADO → APROVADO, OS → Em execução, itens reservada/encomendada', () => {
+    const os = osComOrcamento();
+    os.enviarOrcamento();
+    os.puxarEventos();
+
+    os.aprovarOrcamento('cliente');
+
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(os.orcamento?.status).toBe(StatusOrcamento.APROVADO);
+    expect(os.itensPeca[0].situacao).toBe(SituacaoItemPeca.RESERVADA);
+    expect(os.itensPeca[1].situacao).toBe(SituacaoItemPeca.ENCOMENDADA);
+
+    const aprovado = os
+      .puxarEventos()
+      .find((e) => e.nomeEvento === 'ordem-servico.orcamento-aprovado');
+    expect(aprovado).toBeDefined();
+    // o evento carrega a situação ORIGINAL (para o estoque decidir)
+    const payload = aprovado as unknown as {
+      itensPeca: { situacao: string }[];
+    };
+    expect(payload.itensPeca).toEqual([
+      expect.objectContaining({ situacao: 'DISPONIVEL' }),
+      expect.objectContaining({ situacao: 'EM_COTACAO' }),
+    ]);
+  });
+
+  it('recusar: ENVIADO → RECUSADO e OS → Cancelada', () => {
+    const os = osComOrcamento();
+    os.enviarOrcamento();
+    os.puxarEventos();
+
+    os.recusarOrcamento('Muito caro', 'cliente');
+
+    expect(os.status).toBe(StatusOS.CANCELADA);
+    expect(os.orcamento?.status).toBe(StatusOrcamento.RECUSADO);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.orcamento-recusado',
+    );
+  });
+
+  it('não aprova um orçamento que não foi enviado', () => {
+    const os = osComOrcamento(); // orçamento GERADO, não ENVIADO
+    expect(() => os.aprovarOrcamento()).toThrow(ErroTransicaoInvalida);
+  });
+});

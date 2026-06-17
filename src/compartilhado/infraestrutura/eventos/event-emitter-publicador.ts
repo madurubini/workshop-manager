@@ -15,10 +15,11 @@ export class EventEmitterPublicador implements PublicadorDeEventos {
 
   constructor(private readonly emitter: EventEmitter2) {}
 
-  publicar(...eventos: EventoDominio[]): void {
+  async publicar(...eventos: EventoDominio[]): Promise<void> {
     for (const evento of eventos) {
       this.logger.debug(`Publicando evento "${evento.nomeEvento}"`);
-      this.emitter.emit(evento.nomeEvento, evento);
+      // emitAsync aguarda os assinantes (inclusive os assíncronos).
+      await this.emitter.emitAsync(evento.nomeEvento, evento);
     }
   }
 }

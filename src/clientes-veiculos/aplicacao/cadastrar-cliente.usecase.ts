@@ -49,7 +49,7 @@ export class CadastrarCliente {
     }
 
     await this.clientes.inserir(cliente);
-    this.eventos.publicar(...cliente.puxarEventos());
+    await this.eventos.publicar(...cliente.puxarEventos());
     return cliente;
   }
 }

@@ -1,4 +1,7 @@
-import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
+import {
+  ErroConflito,
+  ErroValidacao,
+} from '../../compartilhado/erros/erros-dominio';
 import { Peca } from './peca';
 
 describe('Peca', () => {
@@ -39,5 +42,61 @@ describe('Peca', () => {
     expect(() =>
       Peca.criar({ id: 'p', codigo: 'C', nome: 'x', precoUnitario: -1 }),
     ).toThrow(ErroValidacao);
+  });
+
+  describe('reservar', () => {
+    function peca(saldo: number, reservado = 0): Peca {
+      return Peca.restaurar('p1', {
+        codigo: 'X',
+        nome: 'Filtro',
+        precoUnitario: 35,
+        saldoFisico: saldo,
+        reservado,
+        ativo: true,
+      });
+    }
+
+    it('reserva dentro do disponível (sobe o reservado, mantém o físico)', () => {
+      const p = peca(10);
+      p.reservar(4);
+      expect(p.reservado).toBe(4);
+      expect(p.saldoFisico).toBe(10);
+      expect(p.disponivel).toBe(6);
+    });
+
+    it('NUNCA reserva acima do disponível', () => {
+      const p = peca(10, 8); // disponível 2
+      expect(() => p.reservar(3)).toThrow(ErroConflito);
+      expect(p.reservado).toBe(8); // inalterado
+    });
+
+    it('rejeita quantidade não positiva', () => {
+      expect(() => peca(10).reservar(0)).toThrow(ErroValidacao);
+    });
+  });
+
+  describe('baixar', () => {
+    function peca(saldo: number, reservado: number): Peca {
+      return Peca.restaurar('p1', {
+        codigo: 'X',
+        nome: 'Filtro',
+        precoUnitario: 35,
+        saldoFisico: saldo,
+        reservado,
+        ativo: true,
+      });
+    }
+
+    it('baixa do reservado (reduz reservado e físico)', () => {
+      const p = peca(10, 4);
+      p.baixar(4);
+      expect(p.reservado).toBe(0);
+      expect(p.saldoFisico).toBe(6);
+    });
+
+    it('não baixa mais do que o reservado', () => {
+      const p = peca(10, 4);
+      expect(() => p.baixar(5)).toThrow(ErroConflito);
+    });
   });
 });

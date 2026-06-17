@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
 import { UsuarioAtual } from '../../identidade/interfaces/usuario-atual.decorator';
 import { UsuarioAutenticado } from '../../identidade/infraestrutura/jwt.strategy';
 import { AbrirOrdemServico } from '../aplicacao/abrir-ordem-servico.usecase';
+import { EnviarOrcamento } from '../aplicacao/enviar-orcamento.usecase';
 import { RegistrarDiagnostico } from '../aplicacao/registrar-diagnostico.usecase';
 import {
   ORDEM_SERVICO_REPOSITORY,
@@ -42,6 +43,7 @@ export class OrdensServicoController {
   constructor(
     private readonly abrirOrdemServico: AbrirOrdemServico,
     private readonly registrarDiagnostico: RegistrarDiagnostico,
+    private readonly enviarOrcamento: EnviarOrcamento,
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
   ) {}
@@ -100,5 +102,22 @@ export class OrdensServicoController {
       por: usuario.username,
     });
     return DiagnosticoRespostaDto.de(ordem);
+  }
+
+  @Post(':id/orcamento/enviar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Envia o orçamento ao cliente (status → Aguardando aprovação; notifica)',
+  })
+  async enviar(
+    @Param('id') id: string,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ): Promise<OrdemServicoRespostaDto> {
+    const ordem = await this.enviarOrcamento.executar({
+      ordemId: id,
+      por: usuario.username,
+    });
+    return OrdemServicoRespostaDto.de(ordem);
   }
 }

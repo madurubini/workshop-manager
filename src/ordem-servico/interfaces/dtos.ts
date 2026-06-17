@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -159,6 +160,52 @@ export class RegistrarDiagnosticoDto {
 class PendenciaEstoqueDto {
   @ApiProperty() pecaId!: string;
   @ApiProperty({ enum: SituacaoItemPeca }) situacao!: SituacaoItemPeca;
+}
+
+/** Visão pública do cliente: status, orçamento e histórico (sem dados internos). */
+export class AcompanhamentoRespostaDto {
+  @ApiProperty() numero!: string;
+  @ApiProperty() problemaRelatado!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() pago!: boolean;
+  @ApiProperty({ type: OrcamentoDto, nullable: true })
+  orcamento!: OrcamentoDto | null;
+  @ApiProperty({ type: [HistoricoItemDto] }) historico!: HistoricoItemDto[];
+
+  static de(ordem: OrdemServico): AcompanhamentoRespostaDto {
+    const o = ordem.orcamento;
+    return {
+      numero: ordem.numero,
+      problemaRelatado: ordem.problemaRelatado,
+      status: ROTULO_STATUS[ordem.status],
+      pago: ordem.pago,
+      orcamento: o
+        ? {
+            id: o.id,
+            totalServicos: o.totalServicos,
+            totalPecas: o.totalPecas,
+            total: o.total,
+            status: o.status,
+          }
+        : null,
+      historico: ordem.historico.map((h) => ({
+        status: ROTULO_STATUS[h.status],
+        em: h.em,
+        por: h.por,
+      })),
+    };
+  }
+}
+
+export class RespostaOrcamentoDto {
+  @ApiProperty({ description: 'true aprova, false recusa o orçamento' })
+  @IsBoolean()
+  aprovado!: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  justificativa?: string;
 }
 
 /** Resposta do diagnóstico no formato do contrato. */

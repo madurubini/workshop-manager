@@ -1,5 +1,8 @@
 import { AgregadoRaiz } from '../../compartilhado/dominio/agregado-raiz';
-import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
+import {
+  ErroConflito,
+  ErroValidacao,
+} from '../../compartilhado/erros/erros-dominio';
 
 interface PropsPeca {
   codigo: string;
@@ -62,6 +65,43 @@ export class Peca extends AgregadoRaiz<string> {
   /** Há disponível suficiente para a quantidade pedida? (somente leitura) */
   temDisponivel(quantidade: number): boolean {
     return this.disponivel >= quantidade;
+  }
+
+  /**
+   * Reserva uma quantidade para uma OS. Invariante: nunca reservar acima do
+   * disponível. Aumenta o "reservado" (o saldo físico só cai na baixa).
+   */
+  reservar(quantidade: number): void {
+    if (quantidade <= 0) {
+      throw new ErroValidacao('Quantidade a reservar deve ser positiva.');
+    }
+    if (quantidade > this.disponivel) {
+      throw new ErroConflito('Não é possível reservar acima do disponível.', {
+        pecaId: this.id,
+        solicitado: quantidade,
+        disponivel: this.disponivel,
+      });
+    }
+    this.props.reservado += quantidade;
+  }
+
+  /**
+   * Baixa peças efetivamente retiradas (Fase 6): só do que está reservado.
+   * Reduz tanto o reservado quanto o saldo físico.
+   */
+  baixar(quantidade: number): void {
+    if (quantidade <= 0) {
+      throw new ErroValidacao('Quantidade a baixar deve ser positiva.');
+    }
+    if (quantidade > this.props.reservado) {
+      throw new ErroConflito('Não é possível baixar mais do que o reservado.', {
+        pecaId: this.id,
+        solicitado: quantidade,
+        reservado: this.props.reservado,
+      });
+    }
+    this.props.reservado -= quantidade;
+    this.props.saldoFisico -= quantidade;
   }
 
   get codigo(): string {

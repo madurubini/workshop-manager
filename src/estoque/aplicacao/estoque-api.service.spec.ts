@@ -23,12 +23,13 @@ describe('EstoqueApiService', () => {
   beforeEach(() => {
     pecas = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorCodigo: jest.fn(),
       listar: jest.fn(),
     };
     cotacoes = { registrar: jest.fn() };
-    fornecedor = { cotar: jest.fn() };
+    fornecedor = { cotar: jest.fn(), encomendar: jest.fn() };
     api = new EstoqueApiService(pecas, cotacoes, fornecedor);
   });
 

@@ -5,7 +5,11 @@ import {
 } from '../../compartilhado/erros/erros-dominio';
 import {
   DiagnosticoConcluido,
+  ItemPecaAprovado,
+  OrcamentoAprovado,
+  OrcamentoEnviado,
   OrcamentoGerado,
+  OrcamentoRecusado,
   OSAberta,
   StatusOSAlterado,
 } from './eventos';
@@ -14,6 +18,7 @@ import {
   ItemPeca,
   ItemServico,
   Orcamento,
+  SituacaoItemPeca,
   StatusOrcamento,
 } from './itens';
 import { StatusOS, transicaoPermitida } from './status-os';
@@ -166,6 +171,71 @@ export class OrdemServico extends AgregadoRaiz<string> {
         this.props.orcamento.total,
       ),
     );
+  }
+
+  /** Envia o orçamento ao cliente: GERADO → ENVIADO; OS → Aguardando aprovação. */
+  enviarOrcamento(por?: string | null): void {
+    const orcamento = this.orcamentoNoEstado(StatusOrcamento.GERADO);
+    orcamento.status = StatusOrcamento.ENVIADO;
+    orcamento.enviadoEm = new Date();
+    this.transicionarPara(StatusOS.AGUARDANDO_APROVACAO, por);
+    this.registrarEvento(new OrcamentoEnviado(this.id, this.props.numero));
+  }
+
+  /**
+   * Cliente aprova o orçamento: ENVIADO → APROVADO; OS → Em execução. Marca os
+   * itens (DISPONIVEL → RESERVADA, EM_COTACAO → ENCOMENDADA) e emite o evento
+   * com a situação ORIGINAL, para o Estoque reservar/encomendar.
+   */
+  aprovarOrcamento(por?: string | null): void {
+    const orcamento = this.orcamentoNoEstado(StatusOrcamento.ENVIADO);
+
+    // Captura a situação original antes de alterar (o Estoque precisa dela).
+    const itensParaEstoque: ItemPecaAprovado[] = this.props.itensPeca.map(
+      (i) => ({
+        pecaId: i.pecaId,
+        quantidade: i.quantidade,
+        situacao:
+          i.situacao === SituacaoItemPeca.DISPONIVEL
+            ? 'DISPONIVEL'
+            : 'EM_COTACAO',
+      }),
+    );
+
+    orcamento.status = StatusOrcamento.APROVADO;
+    orcamento.respondidoEm = new Date();
+
+    for (const item of this.props.itensPeca) {
+      item.situacao =
+        item.situacao === SituacaoItemPeca.DISPONIVEL
+          ? SituacaoItemPeca.RESERVADA
+          : SituacaoItemPeca.ENCOMENDADA;
+    }
+
+    this.transicionarPara(StatusOS.EM_EXECUCAO, por);
+    this.registrarEvento(new OrcamentoAprovado(this.id, itensParaEstoque));
+  }
+
+  /** Cliente recusa o orçamento: ENVIADO → RECUSADO; OS → Cancelada. */
+  recusarOrcamento(justificativa?: string | null, por?: string | null): void {
+    const orcamento = this.orcamentoNoEstado(StatusOrcamento.ENVIADO);
+    orcamento.status = StatusOrcamento.RECUSADO;
+    orcamento.respondidoEm = new Date();
+    this.transicionarPara(StatusOS.CANCELADA, por);
+    this.registrarEvento(new OrcamentoRecusado(this.id, justificativa ?? null));
+  }
+
+  /** Garante que existe orçamento e que ele está no estado esperado. */
+  private orcamentoNoEstado(esperado: StatusOrcamento): Orcamento {
+    if (!this.props.orcamento) {
+      throw new ErroValidacao('Esta OS ainda não tem orçamento.');
+    }
+    if (this.props.orcamento.status !== esperado) {
+      throw new ErroTransicaoInvalida(
+        `Orçamento precisa estar ${esperado}; está ${this.props.orcamento.status}.`,
+      );
+    }
+    return this.props.orcamento;
   }
 
   get numero(): string {

@@ -17,4 +17,11 @@ export interface Fornecedor {
     quantidade: number;
     precoReferencia: number;
   }): Promise<CotacaoFornecedor>;
+
+  /** Faz o pedido de encomenda da peça em falta (após orçamento aprovado). */
+  encomendar(entrada: {
+    ordemId: string;
+    pecaId: string;
+    quantidade: number;
+  }): Promise<void>;
 }

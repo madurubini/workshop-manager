@@ -74,7 +74,7 @@ export class RegistrarDiagnostico {
     });
 
     await this.ordens.atualizar(ordem);
-    this.eventos.publicar(...ordem.puxarEventos());
+    await this.eventos.publicar(...ordem.puxarEventos());
     return ordem;
   }
 

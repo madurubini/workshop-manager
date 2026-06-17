@@ -74,7 +74,7 @@ export class AbrirOrdemServico {
     });
 
     await this.ordens.inserir(ordem);
-    this.eventos.publicar(...ordem.puxarEventos());
+    await this.eventos.publicar(...ordem.puxarEventos());
     return ordem;
   }
 }

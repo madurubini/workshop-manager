@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CotacaoFornecedor, Fornecedor } from '../dominio/fornecedor';
 
 /**
@@ -9,6 +9,8 @@ import { CotacaoFornecedor, Fornecedor } from '../dominio/fornecedor';
  */
 @Injectable()
 export class FornecedorSimulado implements Fornecedor {
+  private readonly logger = new Logger(FornecedorSimulado.name);
+
   async cotar(entrada: {
     pecaId: string;
     quantidade: number;
@@ -20,5 +22,15 @@ export class FornecedorSimulado implements Fornecedor {
       prazoDias: 7,
       fornecedor: 'Fornecedor Padrão (simulado)',
     };
+  }
+
+  async encomendar(entrada: {
+    ordemId: string;
+    pecaId: string;
+    quantidade: number;
+  }): Promise<void> {
+    this.logger.log(
+      `Encomenda enviada ao fornecedor: peça ${entrada.pecaId} x${entrada.quantidade} (OS ${entrada.ordemId}).`,
+    );
   }
 }

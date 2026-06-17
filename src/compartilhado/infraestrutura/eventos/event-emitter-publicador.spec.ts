@@ -12,28 +12,29 @@ class OrcamentoAprovado extends EventoDominio {
 }
 
 describe('EventEmitterPublicador', () => {
-  it('emite cada evento no tópico do seu nomeEvento e entrega aos assinantes', () => {
+  it('emite cada evento no tópico do seu nomeEvento e aguarda os assinantes', async () => {
     const emitter = new EventEmitter2();
     const publicador = new EventEmitterPublicador(emitter);
     const recebidos: EventoDominio[] = [];
 
-    emitter.on('orcamento.aprovado', (evento: EventoDominio) =>
-      recebidos.push(evento),
-    );
+    emitter.on('orcamento.aprovado', async (evento: EventoDominio) => {
+      await Promise.resolve();
+      recebidos.push(evento);
+    });
 
-    publicador.publicar(new OrcamentoAprovado('os-1'));
+    await publicador.publicar(new OrcamentoAprovado('os-1'));
 
     expect(recebidos).toHaveLength(1);
     expect((recebidos[0] as OrcamentoAprovado).ordemId).toBe('os-1');
   });
 
-  it('publica múltiplos eventos numa só chamada', () => {
+  it('publica múltiplos eventos numa só chamada', async () => {
     const emitter = new EventEmitter2();
     const publicador = new EventEmitterPublicador(emitter);
     const espia = jest.fn();
     emitter.on('orcamento.aprovado', espia);
 
-    publicador.publicar(
+    await publicador.publicar(
       new OrcamentoAprovado('os-1'),
       new OrcamentoAprovado('os-2'),
     );

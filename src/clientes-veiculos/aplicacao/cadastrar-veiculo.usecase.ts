@@ -66,7 +66,7 @@ export class CadastrarVeiculo {
     }
 
     await this.veiculos.inserir(veiculo);
-    this.eventos.publicar(...veiculo.puxarEventos());
+    await this.eventos.publicar(...veiculo.puxarEventos());
     return veiculo;
   }
 }

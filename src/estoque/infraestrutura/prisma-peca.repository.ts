@@ -22,6 +22,19 @@ export class PrismaPecaRepository implements PecaRepository {
     });
   }
 
+  async salvar(peca: Peca): Promise<void> {
+    await this.prisma.peca.update({
+      where: { id: peca.id },
+      data: {
+        saldoFisico: peca.saldoFisico,
+        reservado: peca.reservado,
+        precoUnitario: peca.precoUnitario,
+        nome: peca.nome,
+        ativo: peca.ativo,
+      },
+    });
+  }
+
   async buscarPorId(id: string): Promise<Peca | null> {
     const r = await this.prisma.peca.findUnique({ where: { id } });
     return r ? this.mapear(r) : null;
