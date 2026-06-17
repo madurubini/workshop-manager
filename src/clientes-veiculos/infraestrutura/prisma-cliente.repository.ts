@@ -1,0 +1,56 @@
+import { Injectable } from '@nestjs/common';
+import { Cliente as ClientePrisma } from '@prisma/client';
+import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
+import { Cliente } from '../dominio/cliente';
+import { ClienteRepository } from '../dominio/repositorios';
+
+/** Adaptador Prisma da porta ClienteRepository. */
+@Injectable()
+export class PrismaClienteRepository implements ClienteRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async inserir(cliente: Cliente): Promise<void> {
+    await this.prisma.cliente.create({
+      data: {
+        id: cliente.id,
+        tipoDocumento: cliente.documento.tipo,
+        documento: cliente.documento.valor,
+        nome: cliente.nome,
+        email: cliente.email,
+        telefone: cliente.telefone,
+        ativo: cliente.ativo,
+        criadoEm: cliente.criadoEm,
+      },
+    });
+  }
+
+  async buscarPorId(id: string): Promise<Cliente | null> {
+    const registro = await this.prisma.cliente.findUnique({ where: { id } });
+    return registro ? this.mapear(registro) : null;
+  }
+
+  async buscarPorDocumento(documento: string): Promise<Cliente | null> {
+    const registro = await this.prisma.cliente.findUnique({
+      where: { documento },
+    });
+    return registro ? this.mapear(registro) : null;
+  }
+
+  async listar(): Promise<Cliente[]> {
+    const registros = await this.prisma.cliente.findMany({
+      orderBy: { criadoEm: 'desc' },
+    });
+    return registros.map((r) => this.mapear(r));
+  }
+
+  private mapear(r: ClientePrisma): Cliente {
+    return Cliente.restaurar(r.id, {
+      documento: r.documento,
+      nome: r.nome,
+      email: r.email,
+      telefone: r.telefone,
+      ativo: r.ativo,
+      criadoEm: r.criadoEm,
+    });
+  }
+}
