@@ -1,0 +1,241 @@
+// schema.prisma — Sistema de Oficina (MVP, Fase 1)
+// Postgres. Reflete os 3 agregados: Clientes e Veículos, Ordem de Serviço (com Orçamento), Estoque.
+// Decisões aplicadas: preço congelado nos itens, histórico de status, versão (optimistic lock),
+// soft delete nos cadastros, reserva como registro explícito, dinheiro em Decimal.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Identidade e Acesso ───────────────────────────
+
+model Usuario {
+  id        String   @id @default(uuid()) @db.Uuid
+  username  String   @unique
+  senhaHash String
+  papel     String // RECEPCIONISTA | MECANICO | GESTOR
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  @@map("usuario")
+}
+
+// ─────────────────────────── Clientes e Veículos ───────────────────────────
+
+model Cliente {
+  id            String   @id @default(uuid()) @db.Uuid
+  tipoDocumento String // CPF | CNPJ
+  documento     String   @unique // validado na aplicação
+  nome          String
+  email         String?
+  telefone      String?
+  ativo         Boolean  @default(true) // soft delete
+  criadoEm      DateTime @default(now())
+
+  veiculos       Veiculo[]
+  ordensServico  OrdemServico[]
+
+  @@map("cliente")
+}
+
+model Veiculo {
+  id        String   @id @default(uuid()) @db.Uuid
+  clienteId String   @db.Uuid
+  placa     String   @unique // validada na aplicação
+  marca     String
+  modelo    String
+  ano       Int
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  cliente       Cliente        @relation(fields: [clienteId], references: [id])
+  ordensServico OrdemServico[]
+
+  @@index([clienteId])
+  @@map("veiculo")
+}
+
+// ─────────────────────────── Catálogo de Serviços ──────────────────────────
+
+model Servico {
+  id        String   @id @default(uuid()) @db.Uuid
+  nome      String
+  descricao String?
+  precoBase Decimal  @db.Decimal(10, 2)
+  ativo     Boolean  @default(true)
+
+  itens ItemServico[]
+
+  @@map("servico")
+}
+
+// ─────────────────────────── Estoque (raiz Peça) ───────────────────────────
+
+model Peca {
+  id            String   @id @default(uuid()) @db.Uuid
+  codigo        String   @unique
+  nome          String
+  precoUnitario Decimal  @db.Decimal(10, 2)
+  saldoFisico   Int      @default(0)
+  reservado     Int      @default(0) // disponivel = saldoFisico - reservado
+  ativo         Boolean  @default(true)
+  // disponivel é derivado; pode virar uma coluna gerada no Postgres se preferir
+
+  itens    ItemPeca[]
+  reservas ReservaEstoque[]
+  cotacoes Cotacao[]
+
+  @@map("peca")
+}
+
+model ReservaEstoque {
+  id          String   @id @default(uuid()) @db.Uuid
+  pecaId      String   @db.Uuid
+  ordemId     String   @db.Uuid
+  quantidade  Int
+  status      String // RESERVADA | BAIXADA | LIBERADA
+  criadoEm    DateTime @default(now())
+
+  peca  Peca         @relation(fields: [pecaId], references: [id])
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@index([ordemId])
+  @@index([pecaId])
+  @@map("reserva_estoque")
+}
+
+model Cotacao {
+  id          String   @id @default(uuid()) @db.Uuid
+  pecaId      String   @db.Uuid
+  ordemId     String   @db.Uuid
+  preco       Decimal  @db.Decimal(10, 2)
+  prazoDias   Int
+  fornecedor  String?
+  recebidaEm  DateTime @default(now())
+
+  peca  Peca         @relation(fields: [pecaId], references: [id])
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@map("cotacao")
+}
+
+// ─────────────────────────── Ordem de Serviço ──────────────────────────────
+
+model OrdemServico {
+  id              String    @id @default(uuid()) @db.Uuid
+  numero          String    @unique
+  clienteId       String    @db.Uuid
+  veiculoId       String    @db.Uuid
+  problemaRelatado String
+  status          String    @default("RECEBIDA") // máquina de estados (ver enum lógico)
+  versao          Int       @default(0) // optimistic lock
+  criadoEm        DateTime  @default(now())
+  iniciadoExecucaoEm DateTime?
+  finalizadoEm    DateTime?
+  pago            Boolean   @default(false) // pagamento manual: flag de "pode entregar"
+  pagoEm          DateTime?
+
+  cliente    Cliente         @relation(fields: [clienteId], references: [id])
+  veiculo    Veiculo         @relation(fields: [veiculoId], references: [id])
+  orcamento  Orcamento?
+  itensServico ItemServico[]
+  itensPeca    ItemPeca[]
+  reparos      ReparoAdicional[]
+  historico    HistoricoStatus[]
+  reservas     ReservaEstoque[]
+  cotacoes     Cotacao[]
+
+  @@index([clienteId])
+  @@index([veiculoId])
+  @@index([status])
+  @@map("ordem_servico")
+}
+
+// Orçamento é entidade interna da OS (1:1). Aprová-lo/recusá-lo muda o status da OS.
+model Orcamento {
+  id            String    @id @default(uuid()) @db.Uuid
+  ordemId       String    @unique @db.Uuid
+  totalServicos Decimal   @db.Decimal(10, 2)
+  totalPecas    Decimal   @db.Decimal(10, 2)
+  total         Decimal   @db.Decimal(10, 2)
+  status        String    @default("GERADO") // GERADO | ENVIADO | APROVADO | RECUSADO
+  enviadoEm     DateTime?
+  respondidoEm  DateTime?
+
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@map("orcamento")
+}
+
+// Item de serviço com PREÇO CONGELADO no momento da geração do orçamento.
+model ItemServico {
+  id            String  @id @default(uuid()) @db.Uuid
+  ordemId       String  @db.Uuid
+  servicoId     String  @db.Uuid
+  descricao     String // snapshot do nome
+  quantidade    Int     @default(1)
+  precoAplicado Decimal @db.Decimal(10, 2)
+  reparoId      String? @db.Uuid // se veio de um reparo adicional
+
+  ordem   OrdemServico     @relation(fields: [ordemId], references: [id])
+  servico Servico          @relation(fields: [servicoId], references: [id])
+  reparo  ReparoAdicional? @relation(fields: [reparoId], references: [id])
+
+  @@index([ordemId])
+  @@map("item_servico")
+}
+
+// Item de peça com preço congelado e situação no estoque.
+model ItemPeca {
+  id            String  @id @default(uuid()) @db.Uuid
+  ordemId       String  @db.Uuid
+  pecaId        String  @db.Uuid
+  descricao     String
+  quantidade    Int
+  precoAplicado Decimal @db.Decimal(10, 2)
+  situacao      String  @default("PENDENTE") // PENDENTE | DISPONIVEL | EM_COTACAO | ENCOMENDADA | RESERVADA
+  reparoId      String? @db.Uuid
+
+  ordem  OrdemServico     @relation(fields: [ordemId], references: [id])
+  peca   Peca             @relation(fields: [pecaId], references: [id])
+  reparo ReparoAdicional? @relation(fields: [reparoId], references: [id])
+
+  @@index([ordemId])
+  @@map("item_peca")
+}
+
+model ReparoAdicional {
+  id           String    @id @default(uuid()) @db.Uuid
+  ordemId      String    @db.Uuid
+  descricao    String
+  total        Decimal   @db.Decimal(10, 2)
+  status       String    @default("AGUARDANDO") // AGUARDANDO | APROVADO | RECUSADO
+  criadoEm     DateTime  @default(now())
+  respondidoEm DateTime?
+
+  ordem        OrdemServico  @relation(fields: [ordemId], references: [id])
+  itensServico ItemServico[]
+  itensPeca    ItemPeca[]
+
+  @@index([ordemId])
+  @@map("reparo_adicional")
+}
+
+// Foto de cada transição de status — atende o acompanhamento e a auditoria.
+model HistoricoStatus {
+  id       String   @id @default(uuid()) @db.Uuid
+  ordemId  String   @db.Uuid
+  status   String
+  em       DateTime @default(now())
+  por      String? // ator/usuário que disparou
+
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@index([ordemId])
+  @@map("historico_status")
+}

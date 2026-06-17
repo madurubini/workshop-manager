@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/madurubini/Documentos/projetos_pessoais/**)",
+      "Read(//home/madurubini/Documentos/**)",
+      "Bash(cd *)"
+    ]
+  }
+}
