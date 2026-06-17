@@ -74,6 +74,7 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         data: {
           status: ordem.status,
           pago: ordem.pago,
+          pagoEm: ordem.pagoEm,
           iniciadoExecucaoEm: ordem.iniciadoExecucaoEm,
           finalizadoEm: ordem.finalizadoEm,
           versao: ordem.versao + 1,
@@ -211,6 +212,7 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
       status: r.status as StatusOS,
       versao: r.versao,
       pago: r.pago,
+      pagoEm: r.pagoEm,
       criadoEm: r.criadoEm,
       iniciadoExecucaoEm: r.iniciadoExecucaoEm,
       finalizadoEm: r.finalizadoEm,

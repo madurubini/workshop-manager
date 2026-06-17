@@ -2,10 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 // Importações SÓ DE TIPO: contratos dos eventos, sem acoplar ao módulo de OS.
 import type {
+  ExecucaoConcluida,
   OrcamentoAprovado,
   OrcamentoEnviado,
   OrcamentoRecusado,
   ReparoAdicionalLancado,
+  VeiculoEntregue,
 } from '../../ordem-servico/dominio/eventos';
 import { NOTIFICADOR, Notificador } from '../dominio/notificador';
 
@@ -55,6 +57,24 @@ export class NotificarCliente {
       tipo: 'REPARO_LANCADO',
       mensagem:
         'Identificamos um reparo adicional. Autorize ou recuse pelo aplicativo.',
+    });
+  }
+
+  @OnEvent('ordem-servico.execucao-concluida')
+  async aoConcluirExecucao(evento: ExecucaoConcluida): Promise<void> {
+    await this.notificador.notificar({
+      ordemId: evento.ordemId,
+      tipo: 'VEICULO_PRONTO',
+      mensagem: 'Seu veículo está pronto. Após o pagamento, pode ser retirado.',
+    });
+  }
+
+  @OnEvent('ordem-servico.veiculo-entregue')
+  async aoEntregar(evento: VeiculoEntregue): Promise<void> {
+    await this.notificador.notificar({
+      ordemId: evento.ordemId,
+      tipo: 'VEICULO_ENTREGUE',
+      mensagem: `Veículo entregue. OS ${evento.numero} encerrada. Obrigado!`,
     });
   }
 }

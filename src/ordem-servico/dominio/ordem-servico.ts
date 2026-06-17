@@ -13,10 +13,12 @@ import {
   OrcamentoGerado,
   OrcamentoRecusado,
   OSAberta,
+  PagamentoConfirmado,
   ReparoAdicionalLancado,
   ReparoAprovado,
   ReparoRecusado,
   StatusOSAlterado,
+  VeiculoEntregue,
 } from './eventos';
 import {
   arredondar2,
@@ -44,6 +46,7 @@ interface PropsOrdemServico {
   status: StatusOS;
   versao: number;
   pago: boolean;
+  pagoEm: Date | null;
   criadoEm: Date;
   iniciadoExecucaoEm: Date | null;
   finalizadoEm: Date | null;
@@ -90,6 +93,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
       status: StatusOS.RECEBIDA,
       versao: 0,
       pago: false,
+      pagoEm: null,
       criadoEm: agora,
       iniciadoExecucaoEm: null,
       finalizadoEm: null,
@@ -348,6 +352,38 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(new ReparoRecusado(this.id, reparoId));
   }
 
+  /**
+   * Confirma o pagamento (manual): apenas marca a flag e libera a entrega.
+   * Só após a OS estar Finalizada. Não é uma transição de status.
+   */
+  marcarPago(): void {
+    if (this.props.status !== StatusOS.FINALIZADA) {
+      throw new ErroTransicaoInvalida(
+        'O pagamento só pode ser confirmado com a OS finalizada.',
+      );
+    }
+    if (this.props.pago) {
+      throw new ErroValidacao('Esta OS já está paga.');
+    }
+    this.props.pago = true;
+    this.props.pagoEm = new Date();
+    this.registrarEvento(new PagamentoConfirmado(this.id));
+  }
+
+  /**
+   * Entrega o veículo e encerra a OS (Finalizada → Entregue). Exige pagamento
+   * confirmado — regra: reter o veículo até o pagamento.
+   */
+  entregar(por?: string | null): void {
+    if (!this.props.pago) {
+      throw new ErroValidacao(
+        'A entrega exige pagamento confirmado (pago = true).',
+      );
+    }
+    this.transicionarPara(StatusOS.ENTREGUE, por);
+    this.registrarEvento(new VeiculoEntregue(this.id, this.props.numero));
+  }
+
   /** Garante que existe orçamento e que ele está no estado esperado. */
   private orcamentoNoEstado(esperado: StatusOrcamento): Orcamento {
     if (!this.props.orcamento) {
@@ -459,5 +495,8 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
   get finalizadoEm(): Date | null {
     return this.props.finalizadoEm;
+  }
+  get pagoEm(): Date | null {
+    return this.props.pagoEm;
   }
 }

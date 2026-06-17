@@ -70,6 +70,7 @@ export class OrdemServicoRespostaDto {
   @ApiProperty({ example: 'Recebida' }) status!: string;
   @ApiProperty() versao!: number;
   @ApiProperty() pago!: boolean;
+  @ApiProperty({ nullable: true }) pagoEm!: Date | null;
   @ApiProperty() criadoEm!: Date;
   @ApiProperty({ type: [HistoricoItemDto] }) historico!: HistoricoItemDto[];
   @ApiProperty({ type: [ItemServicoDto] }) itensServico!: ItemServicoDto[];
@@ -88,6 +89,7 @@ export class OrdemServicoRespostaDto {
       status: ROTULO_STATUS[ordem.status],
       versao: ordem.versao,
       pago: ordem.pago,
+      pagoEm: ordem.pagoEm,
       criadoEm: ordem.criadoEm,
       historico: ordem.historico.map((h) => ({
         status: ROTULO_STATUS[h.status],
@@ -233,6 +235,12 @@ export class RespostaReparoDto {
   @ApiProperty({ description: 'true autoriza, false recusa o reparo' })
   @IsBoolean()
   aprovado!: boolean;
+}
+
+export class PagamentoDto {
+  @ApiProperty({ example: true, description: 'Confirma o pagamento manual' })
+  @IsBoolean()
+  pago!: boolean;
 }
 
 /** Resposta do diagnóstico no formato do contrato. */

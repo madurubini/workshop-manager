@@ -417,3 +417,66 @@ describe('Execução e reparo adicional', () => {
     );
   });
 });
+
+describe('Pagamento e entrega', () => {
+  function osFinalizada(): OrdemServico {
+    const os = abrirOS();
+    os.registrarDiagnostico({
+      itensServico: [
+        {
+          id: 'is1',
+          servicoId: 's1',
+          descricao: 'S',
+          quantidade: 1,
+          precoAplicado: 100,
+          reparoId: null,
+        },
+      ],
+      itensPeca: [],
+      orcamentoId: 'orc-1',
+    });
+    os.enviarOrcamento();
+    os.aprovarOrcamento('cliente');
+    os.concluirExecucao('mecanico');
+    os.puxarEventos();
+    return os;
+  }
+
+  it('marca pago e emite pagamento-confirmado', () => {
+    const os = osFinalizada();
+    os.marcarPago();
+    expect(os.pago).toBe(true);
+    expect(os.pagoEm).toBeInstanceOf(Date);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.pagamento-confirmado',
+    );
+  });
+
+  it('não marca pago se a OS não está finalizada', () => {
+    const os = abrirOS();
+    expect(() => os.marcarPago()).toThrow(ErroTransicaoInvalida);
+  });
+
+  it('não marca pago duas vezes', () => {
+    const os = osFinalizada();
+    os.marcarPago();
+    expect(() => os.marcarPago()).toThrow(ErroValidacao);
+  });
+
+  it('entrega exige pagamento confirmado', () => {
+    const os = osFinalizada();
+    expect(() => os.entregar('recepcionista')).toThrow(ErroValidacao);
+    expect(os.status).toBe(StatusOS.FINALIZADA);
+  });
+
+  it('entrega após pago: → Entregue e emite veiculo-entregue', () => {
+    const os = osFinalizada();
+    os.marcarPago();
+    os.puxarEventos();
+    os.entregar('recepcionista');
+    expect(os.status).toBe(StatusOS.ENTREGUE);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.veiculo-entregue',
+    );
+  });
+});

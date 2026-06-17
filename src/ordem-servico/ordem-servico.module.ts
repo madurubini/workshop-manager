@@ -5,6 +5,10 @@ import { EstoqueModule } from '../estoque/estoque.module';
 import { AbrirOrdemServico } from './aplicacao/abrir-ordem-servico.usecase';
 import { AprovarOrcamento } from './aplicacao/aprovar-orcamento.usecase';
 import { ConcluirExecucao } from './aplicacao/concluir-execucao.usecase';
+import {
+  ConfirmarPagamento,
+  EntregarVeiculo,
+} from './aplicacao/entrega.usecases';
 import { EnviarOrcamento } from './aplicacao/enviar-orcamento.usecase';
 import { MontadorDeItens } from './aplicacao/montador-de-itens.service';
 import { ORDEM_SERVICO_CONSULTA } from './aplicacao/ordem-servico-consulta.api';
@@ -42,6 +46,8 @@ import { OrdensServicoController } from './interfaces/ordens-servico.controller'
     RegistrarReparoAdicional,
     AprovarReparoAdicional,
     RecusarReparoAdicional,
+    ConfirmarPagamento,
+    EntregarVeiculo,
     {
       provide: ORDEM_SERVICO_REPOSITORY,
       useClass: PrismaOrdemServicoRepository,

@@ -160,3 +160,26 @@ export class ReparoRecusado extends EventoDominio {
     return 'ordem-servico.reparo-recusado';
   }
 }
+
+/** Pagamento confirmado manualmente (libera a entrega). */
+export class PagamentoConfirmado extends EventoDominio {
+  constructor(readonly ordemId: string) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.pagamento-confirmado';
+  }
+}
+
+/** Veículo entregue e OS encerrada. */
+export class VeiculoEntregue extends EventoDominio {
+  constructor(
+    readonly ordemId: string,
+    readonly numero: string,
+  ) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.veiculo-entregue';
+  }
+}

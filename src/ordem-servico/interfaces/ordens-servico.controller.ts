@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -22,6 +23,10 @@ import { UsuarioAtual } from '../../identidade/interfaces/usuario-atual.decorato
 import { UsuarioAutenticado } from '../../identidade/infraestrutura/jwt.strategy';
 import { AbrirOrdemServico } from '../aplicacao/abrir-ordem-servico.usecase';
 import { ConcluirExecucao } from '../aplicacao/concluir-execucao.usecase';
+import {
+  ConfirmarPagamento,
+  EntregarVeiculo,
+} from '../aplicacao/entrega.usecases';
 import { EnviarOrcamento } from '../aplicacao/enviar-orcamento.usecase';
 import { RegistrarDiagnostico } from '../aplicacao/registrar-diagnostico.usecase';
 import { RegistrarReparoAdicional } from '../aplicacao/registrar-reparo-adicional.usecase';
@@ -34,6 +39,7 @@ import {
   AbrirOrdemServicoDto,
   DiagnosticoRespostaDto,
   OrdemServicoRespostaDto,
+  PagamentoDto,
   RegistrarDiagnosticoDto,
   RegistrarReparoAdicionalDto,
 } from './dtos';
@@ -49,6 +55,8 @@ export class OrdensServicoController {
     private readonly enviarOrcamento: EnviarOrcamento,
     private readonly concluirExecucao: ConcluirExecucao,
     private readonly registrarReparoAdicional: RegistrarReparoAdicional,
+    private readonly confirmarPagamento: ConfirmarPagamento,
+    private readonly entregarVeiculo: EntregarVeiculo,
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
   ) {}
@@ -158,6 +166,36 @@ export class OrdensServicoController {
       descricao: dto.descricao,
       servicos: dto.servicos ?? [],
       pecas: dto.pecas ?? [],
+    });
+    return OrdemServicoRespostaDto.de(ordem);
+  }
+
+  @Post(':id/pagamento')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirma o pagamento (manual); libera a entrega' })
+  async pagamento(
+    @Param('id') id: string,
+    @Body() dto: PagamentoDto,
+  ): Promise<OrdemServicoRespostaDto> {
+    if (!dto.pago) {
+      throw new BadRequestException('Envie { "pago": true } para confirmar.');
+    }
+    const ordem = await this.confirmarPagamento.executar({ ordemId: id });
+    return OrdemServicoRespostaDto.de(ordem);
+  }
+
+  @Post(':id/entrega')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Entrega o veículo e encerra a OS (exige pagamento confirmado)',
+  })
+  async entrega(
+    @Param('id') id: string,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ): Promise<OrdemServicoRespostaDto> {
+    const ordem = await this.entregarVeiculo.executar({
+      ordemId: id,
+      por: usuario.username,
     });
     return OrdemServicoRespostaDto.de(ordem);
   }

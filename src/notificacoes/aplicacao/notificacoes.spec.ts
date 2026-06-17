@@ -1,8 +1,10 @@
 import type { OrdemServicoConsultaApi } from '../../ordem-servico/aplicacao/ordem-servico-consulta.api';
 import type {
+  ExecucaoConcluida,
   OrcamentoAprovado,
   OrcamentoEnviado,
   OrcamentoRecusado,
+  VeiculoEntregue,
 } from '../../ordem-servico/dominio/eventos';
 import { Notificador } from '../dominio/notificador';
 import { NotificarCliente } from './notificar-cliente.handler';
@@ -44,6 +46,26 @@ describe('NotificarCliente (assinante de eventos)', () => {
     } as OrcamentoRecusado);
     expect(notificador.notificar).toHaveBeenCalledWith(
       expect.objectContaining({ tipo: 'ORCAMENTO_RECUSADO' }),
+    );
+  });
+
+  it('notifica que o veículo está pronto ao concluir a execução', async () => {
+    await handler.aoConcluirExecucao({
+      ordemId: 'os-1',
+      tempoExecucaoMin: 30,
+    } as ExecucaoConcluida);
+    expect(notificador.notificar).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: 'VEICULO_PRONTO' }),
+    );
+  });
+
+  it('notifica a entrega do veículo', async () => {
+    await handler.aoEntregar({
+      ordemId: 'os-1',
+      numero: 'OS-1',
+    } as VeiculoEntregue);
+    expect(notificador.notificar).toHaveBeenCalledWith(
+      expect.objectContaining({ tipo: 'VEICULO_ENTREGUE' }),
     );
   });
 });
