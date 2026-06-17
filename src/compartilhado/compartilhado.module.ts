@@ -1,18 +1,24 @@
 import { Global, Module } from '@nestjs/common';
 import { PrismaService } from './infraestrutura/prisma/prisma.service';
+import { PUBLICADOR_DE_EVENTOS } from './dominio/publicador-de-eventos';
+import { EventEmitterPublicador } from './infraestrutura/eventos/event-emitter-publicador';
 
 /**
  * Núcleo compartilhado (shared kernel) do monolito modular.
- * Por enquanto exporta o PrismaService; na Fase 2 ganha as classes-base de
- * entidade/evento, os value objects (CPF/CNPJ, Placa) e o event bus.
+ * Exporta a conexão única do banco (PrismaService) e o event bus in-process
+ * (PUBLICADOR_DE_EVENTOS). As classes-base de entidade/evento e os value
+ * objects (Documento, Placa) vivem em `dominio/` e são importados diretamente
+ * pelos módulos — sem vazar entidades entre contextos, pois são abstrações.
  *
- * É @Global para que a conexão única do banco fique disponível aos
- * repositórios de cada módulo sem reimportações — sem vazar entidades entre
- * contextos, pois cada módulo só usa seus próprios repositórios.
+ * É @Global para que esses recursos transversais fiquem disponíveis aos
+ * módulos sem reimportações.
  */
 @Global()
 @Module({
-  providers: [PrismaService],
-  exports: [PrismaService],
+  providers: [
+    PrismaService,
+    { provide: PUBLICADOR_DE_EVENTOS, useClass: EventEmitterPublicador },
+  ],
+  exports: [PrismaService, PUBLICADOR_DE_EVENTOS],
 })
 export class CompartilhadoModule {}
