@@ -61,6 +61,13 @@ class OrcamentoDto {
   @ApiProperty() status!: string;
 }
 
+class ReparoDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() descricao!: string;
+  @ApiProperty() total!: number;
+  @ApiProperty() status!: string;
+}
+
 export class OrdemServicoRespostaDto {
   @ApiProperty() id!: string;
   @ApiProperty() numero!: string;
@@ -75,6 +82,7 @@ export class OrdemServicoRespostaDto {
   @ApiProperty({ type: [HistoricoItemDto] }) historico!: HistoricoItemDto[];
   @ApiProperty({ type: [ItemServicoDto] }) itensServico!: ItemServicoDto[];
   @ApiProperty({ type: [ItemPecaDto] }) itensPeca!: ItemPecaDto[];
+  @ApiProperty({ type: [ReparoDto] }) reparos!: ReparoDto[];
   @ApiProperty({ type: OrcamentoDto, nullable: true })
   orcamento!: OrcamentoDto | null;
 
@@ -108,6 +116,12 @@ export class OrdemServicoRespostaDto {
         quantidade: i.quantidade,
         precoAplicado: i.precoAplicado,
         situacao: i.situacao,
+      })),
+      reparos: ordem.reparos.map((r) => ({
+        id: r.id,
+        descricao: r.descricao,
+        total: r.total,
+        status: r.status,
       })),
       orcamento: o
         ? {
