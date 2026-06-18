@@ -15,6 +15,7 @@ describe('CadastrarCliente', () => {
   beforeEach(() => {
     repo = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorDocumento: jest.fn(),
       listar: jest.fn(),

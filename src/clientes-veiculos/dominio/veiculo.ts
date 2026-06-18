@@ -88,6 +88,35 @@ export class Veiculo extends AgregadoRaiz<string> {
     });
   }
 
+  /** Atualiza marca/modelo/ano. A placa é imutável (é a identidade). */
+  atualizarDados(entrada: {
+    marca?: string;
+    modelo?: string;
+    ano?: number;
+  }): void {
+    if (entrada.marca !== undefined) {
+      if (!entrada.marca.trim()) {
+        throw new ErroValidacao('Marca não pode ser vazia.');
+      }
+      this.props.marca = entrada.marca.trim();
+    }
+    if (entrada.modelo !== undefined) {
+      if (!entrada.modelo.trim()) {
+        throw new ErroValidacao('Modelo não pode ser vazio.');
+      }
+      this.props.modelo = entrada.modelo.trim();
+    }
+    if (entrada.ano !== undefined) {
+      const anoAtual = new Date().getFullYear();
+      if (entrada.ano < ANO_MINIMO || entrada.ano > anoAtual + 1) {
+        throw new ErroValidacao(
+          `Ano do veículo deve estar entre ${ANO_MINIMO} e ${anoAtual + 1}.`,
+        );
+      }
+      this.props.ano = entrada.ano;
+    }
+  }
+
   inativar(): void {
     this.props.ativo = false;
   }

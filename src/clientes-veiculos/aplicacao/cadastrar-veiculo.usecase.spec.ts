@@ -32,12 +32,14 @@ describe('CadastrarVeiculo', () => {
   beforeEach(() => {
     veiculos = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorPlaca: jest.fn(),
       listarPorCliente: jest.fn(),
     };
     clientes = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorDocumento: jest.fn(),
       listar: jest.fn(),

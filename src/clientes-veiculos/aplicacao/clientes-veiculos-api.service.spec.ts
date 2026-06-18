@@ -11,12 +11,14 @@ describe('ClientesVeiculosApiService (porta pública / open-host)', () => {
   beforeEach(() => {
     clientes = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorDocumento: jest.fn(),
       listar: jest.fn(),
     };
     veiculos = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorPlaca: jest.fn(),
       listarPorCliente: jest.fn(),

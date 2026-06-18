@@ -1,6 +1,14 @@
 import { Module } from '@nestjs/common';
 import { CadastrarCliente } from './aplicacao/cadastrar-cliente.usecase';
 import { CadastrarVeiculo } from './aplicacao/cadastrar-veiculo.usecase';
+import {
+  AtualizarCliente,
+  RemoverCliente,
+} from './aplicacao/gerenciar-cliente.usecases';
+import {
+  AtualizarVeiculo,
+  RemoverVeiculo,
+} from './aplicacao/gerenciar-veiculo.usecases';
 import { CLIENTES_VEICULOS_API } from './aplicacao/clientes-veiculos.api';
 import { ClientesVeiculosApiService } from './aplicacao/clientes-veiculos-api.service';
 import { CLIENTE_REPOSITORY, VEICULO_REPOSITORY } from './dominio/repositorios';
@@ -20,6 +28,10 @@ import { VeiculosController } from './interfaces/veiculos.controller';
   providers: [
     CadastrarCliente,
     CadastrarVeiculo,
+    AtualizarCliente,
+    RemoverCliente,
+    AtualizarVeiculo,
+    RemoverVeiculo,
     { provide: CLIENTE_REPOSITORY, useClass: PrismaClienteRepository },
     { provide: VEICULO_REPOSITORY, useClass: PrismaVeiculoRepository },
     { provide: CLIENTES_VEICULOS_API, useClass: ClientesVeiculosApiService },

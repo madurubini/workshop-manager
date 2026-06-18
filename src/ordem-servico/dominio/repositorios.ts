@@ -8,6 +8,16 @@ export interface FiltroOrdens {
   clienteId?: string;
 }
 
+export interface PeriodoRelatorio {
+  inicio?: Date;
+  fim?: Date;
+}
+
+export interface TempoExecucao {
+  iniciadoExecucaoEm: Date;
+  finalizadoEm: Date;
+}
+
 export interface OrdemServicoRepository {
   inserir(ordem: OrdemServico): Promise<void>;
   /**
@@ -19,4 +29,6 @@ export interface OrdemServicoRepository {
   listar(filtro?: FiltroOrdens): Promise<OrdemServico[]>;
   /** Gera o próximo número sequencial da OS (ex.: OS-000001). */
   proximoNumero(): Promise<string>;
+  /** OS com execução concluída (tempos), para o relatório de tempo médio. */
+  listarTemposExecucao(periodo?: PeriodoRelatorio): Promise<TempoExecucao[]>;
 }

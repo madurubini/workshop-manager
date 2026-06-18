@@ -73,6 +73,26 @@ export class Cliente extends AgregadoRaiz<string> {
     });
   }
 
+  /** Atualiza dados de contato. O documento é imutável (é a identidade). */
+  atualizarDados(entrada: {
+    nome?: string;
+    email?: string | null;
+    telefone?: string | null;
+  }): void {
+    if (entrada.nome !== undefined) {
+      if (!entrada.nome.trim()) {
+        throw new ErroValidacao('Nome do cliente não pode ser vazio.');
+      }
+      this.props.nome = entrada.nome.trim();
+    }
+    if (entrada.email !== undefined) {
+      this.props.email = entrada.email;
+    }
+    if (entrada.telefone !== undefined) {
+      this.props.telefone = entrada.telefone;
+    }
+  }
+
   /** Soft delete: inativa o cliente sem apagar o registro. */
   inativar(): void {
     this.props.ativo = false;

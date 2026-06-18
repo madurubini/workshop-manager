@@ -99,4 +99,69 @@ describe('Peca', () => {
       expect(() => p.baixar(5)).toThrow(ErroConflito);
     });
   });
+
+  describe('ajustarSaldo', () => {
+    function peca(saldo: number, reservado = 0): Peca {
+      return Peca.restaurar('p1', {
+        codigo: 'X',
+        nome: 'Filtro',
+        precoUnitario: 35,
+        saldoFisico: saldo,
+        reservado,
+        ativo: true,
+      });
+    }
+
+    it('entrada aumenta o saldo físico', () => {
+      const p = peca(10);
+      p.ajustarSaldo('ENTRADA', 5);
+      expect(p.saldoFisico).toBe(15);
+    });
+
+    it('saída reduz o saldo físico', () => {
+      const p = peca(10);
+      p.ajustarSaldo('SAIDA', 4);
+      expect(p.saldoFisico).toBe(6);
+    });
+
+    it('saída não pode deixar o saldo abaixo do reservado', () => {
+      const p = peca(10, 8); // disponível 2
+      expect(() => p.ajustarSaldo('SAIDA', 3)).toThrow(ErroConflito);
+      expect(p.saldoFisico).toBe(10);
+    });
+
+    it('rejeita quantidade não positiva', () => {
+      expect(() => peca(10).ajustarSaldo('ENTRADA', 0)).toThrow(ErroValidacao);
+    });
+  });
+
+  describe('atualizarDados e inativar', () => {
+    function peca(): Peca {
+      return Peca.criar({
+        id: 'p1',
+        codigo: 'X',
+        nome: 'Filtro',
+        precoUnitario: 35,
+      });
+    }
+
+    it('atualiza nome e preço', () => {
+      const p = peca();
+      p.atualizarDados({ nome: 'Filtro novo', precoUnitario: 40 });
+      expect(p.nome).toBe('Filtro novo');
+      expect(p.precoUnitario).toBe(40);
+    });
+
+    it('rejeita preço negativo', () => {
+      expect(() => peca().atualizarDados({ precoUnitario: -1 })).toThrow(
+        ErroValidacao,
+      );
+    });
+
+    it('inativa', () => {
+      const p = peca();
+      p.inativar();
+      expect(p.ativo).toBe(false);
+    });
+  });
 });

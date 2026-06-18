@@ -16,6 +16,7 @@ import { OrdemServicoConsultaService } from './aplicacao/ordem-servico-consulta.
 import { RecusarOrcamento } from './aplicacao/recusar-orcamento.usecase';
 import { RegistrarDiagnostico } from './aplicacao/registrar-diagnostico.usecase';
 import { RegistrarReparoAdicional } from './aplicacao/registrar-reparo-adicional.usecase';
+import { RelatorioTempoMedioExecucao } from './aplicacao/relatorio-tempo-medio.usecase';
 import {
   AprovarReparoAdicional,
   RecusarReparoAdicional,
@@ -24,6 +25,7 @@ import { ORDEM_SERVICO_REPOSITORY } from './dominio/repositorios';
 import { PrismaOrdemServicoRepository } from './infraestrutura/prisma-ordem-servico.repository';
 import { AcompanhamentoController } from './interfaces/acompanhamento.controller';
 import { OrdensServicoController } from './interfaces/ordens-servico.controller';
+import { RelatoriosController } from './interfaces/relatorios.controller';
 
 /**
  * Contexto Ordem de Serviço (núcleo). Importa os outros contextos apenas para
@@ -34,7 +36,11 @@ import { OrdensServicoController } from './interfaces/ordens-servico.controller'
  */
 @Module({
   imports: [ClientesVeiculosModule, CatalogoServicosModule, EstoqueModule],
-  controllers: [OrdensServicoController, AcompanhamentoController],
+  controllers: [
+    OrdensServicoController,
+    AcompanhamentoController,
+    RelatoriosController,
+  ],
   providers: [
     MontadorDeItens,
     AbrirOrdemServico,
@@ -48,6 +54,7 @@ import { OrdensServicoController } from './interfaces/ordens-servico.controller'
     RecusarReparoAdicional,
     ConfirmarPagamento,
     EntregarVeiculo,
+    RelatorioTempoMedioExecucao,
     {
       provide: ORDEM_SERVICO_REPOSITORY,
       useClass: PrismaOrdemServicoRepository,

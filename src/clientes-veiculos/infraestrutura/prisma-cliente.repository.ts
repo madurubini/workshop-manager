@@ -24,6 +24,18 @@ export class PrismaClienteRepository implements ClienteRepository {
     });
   }
 
+  async salvar(cliente: Cliente): Promise<void> {
+    await this.prisma.cliente.update({
+      where: { id: cliente.id },
+      data: {
+        nome: cliente.nome,
+        email: cliente.email,
+        telefone: cliente.telefone,
+        ativo: cliente.ativo,
+      },
+    });
+  }
+
   async buscarPorId(id: string): Promise<Cliente | null> {
     const registro = await this.prisma.cliente.findUnique({ where: { id } });
     return registro ? this.mapear(registro) : null;

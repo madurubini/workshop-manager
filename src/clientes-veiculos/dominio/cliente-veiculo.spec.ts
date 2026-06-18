@@ -34,6 +34,27 @@ describe('Cliente', () => {
     expect(cliente.ativo).toBe(false);
   });
 
+  it('atualiza dados de contato (documento imutável)', () => {
+    const cliente = Cliente.cadastrar({
+      id: 'c1',
+      documento: '52998224725',
+      nome: 'Maria',
+    });
+    cliente.atualizarDados({ nome: '  Maria Silva  ', telefone: '119' });
+    expect(cliente.nome).toBe('Maria Silva');
+    expect(cliente.telefone).toBe('119');
+    expect(cliente.documento.valor).toBe('52998224725');
+  });
+
+  it('rejeita nome vazio na atualização', () => {
+    const cliente = Cliente.cadastrar({
+      id: 'c1',
+      documento: '52998224725',
+      nome: 'Maria',
+    });
+    expect(() => cliente.atualizarDados({ nome: '  ' })).toThrow(ErroValidacao);
+  });
+
   it('restaura a partir do persistido sem gerar eventos', () => {
     const criadoEm = new Date('2026-01-01');
     const cliente = Cliente.restaurar('c1', {
@@ -90,6 +111,19 @@ describe('Veiculo', () => {
     expect(() =>
       Veiculo.registrar({ ...base, ano: new Date().getFullYear() + 5 }),
     ).toThrow(ErroValidacao);
+  });
+
+  it('atualiza marca/modelo/ano (placa imutável)', () => {
+    const veiculo = Veiculo.registrar(base);
+    veiculo.atualizarDados({ modelo: 'Gol GTI', ano: 2021 });
+    expect(veiculo.modelo).toBe('Gol GTI');
+    expect(veiculo.ano).toBe(2021);
+    expect(veiculo.placa.valor).toBe('ABC1234');
+  });
+
+  it('rejeita ano inválido na atualização', () => {
+    const veiculo = Veiculo.registrar(base);
+    expect(() => veiculo.atualizarDados({ ano: 1800 })).toThrow(ErroValidacao);
   });
 
   it('inativa e restaura', () => {

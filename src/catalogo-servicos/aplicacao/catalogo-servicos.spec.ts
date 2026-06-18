@@ -26,6 +26,19 @@ describe('Servico (domínio)', () => {
     s.inativar();
     expect(s.ativo).toBe(false);
   });
+
+  it('atualiza dados', () => {
+    const s = Servico.criar({ id: 's1', nome: 'X', precoBase: 10 });
+    s.atualizarDados({ nome: 'Y', precoBase: 20, descricao: 'desc' });
+    expect(s.nome).toBe('Y');
+    expect(s.precoBase).toBe(20);
+    expect(s.descricao).toBe('desc');
+  });
+
+  it('rejeita preço negativo na atualização', () => {
+    const s = Servico.criar({ id: 's1', nome: 'X', precoBase: 10 });
+    expect(() => s.atualizarDados({ precoBase: -1 })).toThrow(ErroValidacao);
+  });
 });
 
 describe('CatalogoServicosApiService (porta pública)', () => {
@@ -35,6 +48,7 @@ describe('CatalogoServicosApiService (porta pública)', () => {
   beforeEach(() => {
     servicos = {
       inserir: jest.fn(),
+      salvar: jest.fn(),
       buscarPorId: jest.fn(),
       listar: jest.fn(),
     };

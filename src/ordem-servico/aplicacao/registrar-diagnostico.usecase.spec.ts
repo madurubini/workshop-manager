@@ -35,6 +35,7 @@ describe('RegistrarDiagnostico', () => {
       buscarPorId: jest.fn(),
       listar: jest.fn(),
       proximoNumero: jest.fn(),
+      listarTemposExecucao: jest.fn(),
     };
     montador = {
       montarServicos: jest.fn().mockResolvedValue([

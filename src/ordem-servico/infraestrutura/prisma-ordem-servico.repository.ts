@@ -16,7 +16,12 @@ import {
   StatusReparo,
 } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
-import { FiltroOrdens, OrdemServicoRepository } from '../dominio/repositorios';
+import {
+  FiltroOrdens,
+  OrdemServicoRepository,
+  PeriodoRelatorio,
+  TempoExecucao,
+} from '../dominio/repositorios';
 import { StatusOS } from '../dominio/status-os';
 
 type OrdemCompleta = OrdemPrisma & {
@@ -201,6 +206,32 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
   async proximoNumero(): Promise<string> {
     const total = await this.prisma.ordemServico.count();
     return `OS-${String(total + 1).padStart(6, '0')}`;
+  }
+
+  async listarTemposExecucao(
+    periodo?: PeriodoRelatorio,
+  ): Promise<TempoExecucao[]> {
+    const finalizadoEm: Prisma.DateTimeFilter = {};
+    if (periodo?.inicio) {
+      finalizadoEm.gte = periodo.inicio;
+    }
+    if (periodo?.fim) {
+      finalizadoEm.lte = periodo.fim;
+    }
+    const registros = await this.prisma.ordemServico.findMany({
+      where: {
+        iniciadoExecucaoEm: { not: null },
+        finalizadoEm:
+          periodo?.inicio || periodo?.fim ? finalizadoEm : { not: null },
+      },
+      select: { iniciadoExecucaoEm: true, finalizadoEm: true },
+    });
+    return registros
+      .filter((r) => r.iniciadoExecucaoEm && r.finalizadoEm)
+      .map((r) => ({
+        iniciadoExecucaoEm: r.iniciadoExecucaoEm as Date,
+        finalizadoEm: r.finalizadoEm as Date,
+      }));
   }
 
   private mapear(r: OrdemCompleta): OrdemServico {

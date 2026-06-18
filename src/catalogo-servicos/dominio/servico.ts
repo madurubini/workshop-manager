@@ -46,6 +46,28 @@ export class Servico extends AgregadoRaiz<string> {
     return new Servico(id, props);
   }
 
+  atualizarDados(entrada: {
+    nome?: string;
+    descricao?: string | null;
+    precoBase?: number;
+  }): void {
+    if (entrada.nome !== undefined) {
+      if (!entrada.nome.trim()) {
+        throw new ErroValidacao('Nome do serviço não pode ser vazio.');
+      }
+      this.props.nome = entrada.nome.trim();
+    }
+    if (entrada.descricao !== undefined) {
+      this.props.descricao = entrada.descricao;
+    }
+    if (entrada.precoBase !== undefined) {
+      if (entrada.precoBase < 0) {
+        throw new ErroValidacao('Preço base não pode ser negativo.');
+      }
+      this.props.precoBase = entrada.precoBase;
+    }
+  }
+
   inativar(): void {
     this.props.ativo = false;
   }

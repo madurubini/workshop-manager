@@ -1,18 +1,30 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Inject,
   NotFoundException,
   Param,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
 import { CadastrarVeiculo } from '../aplicacao/cadastrar-veiculo.usecase';
+import {
+  AtualizarVeiculo,
+  RemoverVeiculo,
+} from '../aplicacao/gerenciar-veiculo.usecases';
 import { VEICULO_REPOSITORY, VeiculoRepository } from '../dominio/repositorios';
-import { CriarVeiculoDto, VeiculoRespostaDto } from './dtos';
+import {
+  AtualizarVeiculoDto,
+  CriarVeiculoDto,
+  VeiculoRespostaDto,
+} from './dtos';
 
 @ApiTags('Veículos')
 @ApiBearerAuth()
@@ -21,6 +33,8 @@ import { CriarVeiculoDto, VeiculoRespostaDto } from './dtos';
 export class VeiculosController {
   constructor(
     private readonly cadastrarVeiculo: CadastrarVeiculo,
+    private readonly atualizarVeiculo: AtualizarVeiculo,
+    private readonly removerVeiculo: RemoverVeiculo,
     @Inject(VEICULO_REPOSITORY)
     private readonly veiculos: VeiculoRepository,
   ) {}
@@ -55,5 +69,22 @@ export class VeiculosController {
       throw new NotFoundException('Veículo não encontrado.');
     }
     return VeiculoRespostaDto.de(veiculo);
+  }
+
+  @Put('veiculos/:id')
+  @ApiOperation({ summary: 'Atualiza marca/modelo/ano do veículo' })
+  async atualizar(
+    @Param('id') id: string,
+    @Body() dto: AtualizarVeiculoDto,
+  ): Promise<VeiculoRespostaDto> {
+    const veiculo = await this.atualizarVeiculo.executar({ id, ...dto });
+    return VeiculoRespostaDto.de(veiculo);
+  }
+
+  @Delete('veiculos/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove o veículo (soft delete)' })
+  async remover(@Param('id') id: string): Promise<void> {
+    await this.removerVeiculo.executar({ id });
   }
 }

@@ -24,6 +24,18 @@ export class PrismaVeiculoRepository implements VeiculoRepository {
     });
   }
 
+  async salvar(veiculo: Veiculo): Promise<void> {
+    await this.prisma.veiculo.update({
+      where: { id: veiculo.id },
+      data: {
+        marca: veiculo.marca,
+        modelo: veiculo.modelo,
+        ano: veiculo.ano,
+        ativo: veiculo.ativo,
+      },
+    });
+  }
+
   async buscarPorId(id: string): Promise<Veiculo | null> {
     const registro = await this.prisma.veiculo.findUnique({ where: { id } });
     return registro ? this.mapear(registro) : null;

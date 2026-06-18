@@ -1,0 +1,92 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
+import {
+  AjustarEstoque,
+  AtualizarPeca,
+  CadastrarPeca,
+  RemoverPeca,
+} from '../aplicacao/peca-crud.usecases';
+import { PECA_REPOSITORY, PecaRepository } from '../dominio/repositorios';
+import {
+  AjusteEstoqueDto,
+  AtualizarPecaDto,
+  CriarPecaDto,
+  PecaRespostaDto,
+} from './dtos';
+
+@ApiTags('Peças e estoque')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('pecas')
+export class PecasController {
+  constructor(
+    private readonly cadastrar: CadastrarPeca,
+    private readonly atualizar: AtualizarPeca,
+    private readonly remover: RemoverPeca,
+    private readonly ajustar: AjustarEstoque,
+    @Inject(PECA_REPOSITORY)
+    private readonly pecas: PecaRepository,
+  ) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Cadastra uma peça (código único)' })
+  async criar(@Body() dto: CriarPecaDto): Promise<PecaRespostaDto> {
+    return PecaRespostaDto.de(await this.cadastrar.executar(dto));
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Lista as peças ativas' })
+  async listar(): Promise<PecaRespostaDto[]> {
+    return (await this.pecas.listar()).map(PecaRespostaDto.de);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Detalha uma peça' })
+  async porId(@Param('id') id: string): Promise<PecaRespostaDto> {
+    const peca = await this.pecas.buscarPorId(id);
+    if (!peca) {
+      throw new NotFoundException('Peça não encontrada.');
+    }
+    return PecaRespostaDto.de(peca);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Atualiza nome/preço da peça' })
+  async editar(
+    @Param('id') id: string,
+    @Body() dto: AtualizarPecaDto,
+  ): Promise<PecaRespostaDto> {
+    return PecaRespostaDto.de(await this.atualizar.executar({ id, ...dto }));
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove uma peça (soft delete)' })
+  async excluir(@Param('id') id: string): Promise<void> {
+    await this.remover.executar({ id });
+  }
+
+  @Patch(':id/estoque')
+  @ApiOperation({ summary: 'Ajuste manual de saldo (entrada/saída)' })
+  async ajustarEstoque(
+    @Param('id') id: string,
+    @Body() dto: AjusteEstoqueDto,
+  ): Promise<PecaRespostaDto> {
+    return PecaRespostaDto.de(await this.ajustar.executar({ id, ...dto }));
+  }
+}

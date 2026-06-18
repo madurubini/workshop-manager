@@ -20,6 +20,18 @@ export class PrismaServicoRepository implements ServicoRepository {
     });
   }
 
+  async salvar(servico: Servico): Promise<void> {
+    await this.prisma.servico.update({
+      where: { id: servico.id },
+      data: {
+        nome: servico.nome,
+        descricao: servico.descricao,
+        precoBase: servico.precoBase,
+        ativo: servico.ativo,
+      },
+    });
+  }
+
   async buscarPorId(id: string): Promise<Servico | null> {
     const r = await this.prisma.servico.findUnique({ where: { id } });
     return r ? this.mapear(r) : null;

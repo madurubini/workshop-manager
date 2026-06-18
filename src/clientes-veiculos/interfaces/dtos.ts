@@ -59,6 +59,45 @@ export class CriarVeiculoDto {
   ano!: number;
 }
 
+export class AtualizarClienteDto {
+  @ApiPropertyOptional({ example: 'Maria Oliveira' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  nome?: string;
+
+  @ApiPropertyOptional({ example: 'maria@email.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ example: '11999998888' })
+  @IsOptional()
+  @IsString()
+  telefone?: string;
+}
+
+export class AtualizarVeiculoDto {
+  @ApiPropertyOptional({ example: 'Volkswagen' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  marca?: string;
+
+  @ApiPropertyOptional({ example: 'Gol' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  modelo?: string;
+
+  @ApiPropertyOptional({ example: 2020 })
+  @IsOptional()
+  @IsInt()
+  @Min(1900)
+  @Max(new Date().getFullYear() + 1)
+  ano?: number;
+}
+
 export class ClienteRespostaDto {
   @ApiProperty() id!: string;
   @ApiProperty() tipoDocumento!: string;
