@@ -26,10 +26,23 @@ async function bootstrap(): Promise<void> {
   const config = new DocumentBuilder()
     .setTitle('Sistema de Oficina — API')
     .setDescription(
-      'Atendimento e Execução de Serviços de oficina mecânica (DDD, monolito modular).',
+      'Atendimento e Execução de Serviços de oficina mecânica (DDD, monolito modular). ' +
+        'Rotas administrativas exigem JWT (Bearer); as de /acompanhamento são públicas (token da OS). ' +
+        'Erros seguem o envelope { erro: { codigo, mensagem, detalhes } }.',
     )
     .setVersion('1.0')
     .addBearerAuth()
+    .addTag('Autenticação', 'Login e emissão do JWT')
+    .addTag('Clientes', 'CRUD de clientes (CPF/CNPJ único)')
+    .addTag('Veículos', 'CRUD de veículos (placa única)')
+    .addTag('Serviços (catálogo)', 'CRUD do catálogo de serviços')
+    .addTag('Peças e estoque', 'CRUD de peças e ajuste de saldo')
+    .addTag('Ordens de Serviço', 'Ciclo de vida da OS (admin)')
+    .addTag(
+      'Acompanhamento do cliente',
+      'Consulta e decisões do cliente (público)',
+    )
+    .addTag('Relatórios', 'Indicadores gerenciais')
     .build();
   const documento = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, documento);
