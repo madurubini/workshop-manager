@@ -33,16 +33,17 @@ export class ReenviarPendentes {
       });
     }
 
-    const reparos = await this.consulta.listarReparosAguardando();
-    for (const r of reparos) {
+    const adicionais =
+      await this.consulta.listarOrcamentosAdicionaisAguardando();
+    for (const a of adicionais) {
       await this.notificador.notificar({
-        ordemId: r.ordemId,
-        tipo: 'LEMBRETE_REPARO',
-        mensagem: `Lembrete: o reparo adicional da OS ${r.numero} aguarda sua autorização.`,
+        ordemId: a.ordemId,
+        tipo: 'LEMBRETE_ORCAMENTO_ADICIONAL',
+        mensagem: `Lembrete: o orçamento adicional da OS ${a.numero} aguarda sua autorização.`,
       });
     }
 
-    const total = orcamentos.length + reparos.length;
+    const total = orcamentos.length + adicionais.length;
     if (total > 0) {
       this.logger.log(`Reenviado lembrete para ${total} pendência(s).`);
     }

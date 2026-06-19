@@ -1,19 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import {
   HistoricoStatus as HistoricoPrisma,
-  ItemPeca as ItemPecaPrisma,
-  ItemServico as ItemServicoPrisma,
   Orcamento as OrcamentoPrisma,
   OrdemServico as OrdemPrisma,
+  PecaOrcada as PecaOrcadaPrisma,
   Prisma,
-  ReparoAdicional as ReparoPrisma,
+  ServicoOrcado as ServicoOrcadoPrisma,
 } from '@prisma/client';
 import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
 import { ErroConflito } from '../../compartilhado/erros/erros-dominio';
 import {
-  SituacaoItemPeca,
+  SituacaoPecaOrcada,
   StatusOrcamento,
-  StatusReparo,
+  TipoOrcamento,
 } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import {
@@ -24,20 +23,22 @@ import {
 } from '../dominio/repositorios';
 import { StatusOS } from '../dominio/status-os';
 
+type OrcamentoCompleto = OrcamentoPrisma & {
+  servicos: ServicoOrcadoPrisma[];
+  pecas: PecaOrcadaPrisma[];
+};
+
 type OrdemCompleta = OrdemPrisma & {
   historico: HistoricoPrisma[];
-  itensServico: ItemServicoPrisma[];
-  itensPeca: ItemPecaPrisma[];
-  reparos: ReparoPrisma[];
-  orcamento: OrcamentoPrisma | null;
+  orcamentos: OrcamentoCompleto[];
 };
 
 const INCLUDE_COMPLETO = {
   historico: { orderBy: { em: 'asc' } },
-  itensServico: true,
-  itensPeca: true,
-  reparos: true,
-  orcamento: true,
+  orcamentos: {
+    orderBy: { criadoEm: 'asc' },
+    include: { servicos: true, pecas: true },
+  },
 } as const;
 
 /** Adaptador Prisma da porta OrdemServicoRepository. */
@@ -92,13 +93,17 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         );
       }
 
-      // O agregado é a fonte de verdade: regrava histórico, itens, reparos e
-      // orçamento. Apaga os itens (filhos) antes dos reparos (pais) por causa
-      // da FK reparoId; recria os reparos antes dos itens.
+      // O agregado é a fonte de verdade: regrava histórico e orçamentos (com
+      // suas linhas). Apaga as linhas (filhas) antes dos orçamentos (pais) por
+      // causa da FK orcamentoId; recria os orçamentos antes das linhas.
       await tx.historicoStatus.deleteMany({ where: { ordemId: ordem.id } });
-      await tx.itemServico.deleteMany({ where: { ordemId: ordem.id } });
-      await tx.itemPeca.deleteMany({ where: { ordemId: ordem.id } });
-      await tx.reparoAdicional.deleteMany({ where: { ordemId: ordem.id } });
+      await tx.servicoOrcado.deleteMany({
+        where: { orcamento: { ordemId: ordem.id } },
+      });
+      await tx.pecaOrcada.deleteMany({
+        where: { orcamento: { ordemId: ordem.id } },
+      });
+      await tx.orcamento.deleteMany({ where: { ordemId: ordem.id } });
 
       await tx.historicoStatus.createMany({
         data: ordem.historico.map((h) => ({
@@ -109,72 +114,47 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         })),
       });
 
-      if (ordem.reparos.length > 0) {
-        await tx.reparoAdicional.createMany({
-          data: ordem.reparos.map((r) => ({
-            id: r.id,
-            ordemId: ordem.id,
-            descricao: r.descricao,
-            total: r.total,
-            status: r.status,
-            criadoEm: r.criadoEm,
-            respondidoEm: r.respondidoEm,
-          })),
-        });
-      }
-
-      if (ordem.itensServico.length > 0) {
-        await tx.itemServico.createMany({
-          data: ordem.itensServico.map((i) => ({
-            id: i.id,
-            ordemId: ordem.id,
-            servicoId: i.servicoId,
-            descricao: i.descricao,
-            quantidade: i.quantidade,
-            precoAplicado: i.precoAplicado,
-            reparoId: i.reparoId,
-          })),
-        });
-      }
-
-      if (ordem.itensPeca.length > 0) {
-        await tx.itemPeca.createMany({
-          data: ordem.itensPeca.map((i) => ({
-            id: i.id,
-            ordemId: ordem.id,
-            pecaId: i.pecaId,
-            descricao: i.descricao,
-            quantidade: i.quantidade,
-            precoAplicado: i.precoAplicado,
-            situacao: i.situacao,
-            reparoId: i.reparoId,
-          })),
-        });
-      }
-
-      if (ordem.orcamento) {
-        const o = ordem.orcamento;
-        await tx.orcamento.upsert({
-          where: { ordemId: ordem.id },
-          create: {
+      for (const o of ordem.orcamentos) {
+        await tx.orcamento.create({
+          data: {
             id: o.id,
             ordemId: ordem.id,
+            tipo: o.tipo,
+            descricao: o.descricao,
             totalServicos: o.totalServicos,
             totalPecas: o.totalPecas,
             total: o.total,
             status: o.status,
-            enviadoEm: o.enviadoEm,
-            respondidoEm: o.respondidoEm,
-          },
-          update: {
-            totalServicos: o.totalServicos,
-            totalPecas: o.totalPecas,
-            total: o.total,
-            status: o.status,
+            criadoEm: o.criadoEm,
             enviadoEm: o.enviadoEm,
             respondidoEm: o.respondidoEm,
           },
         });
+        if (o.servicos.length > 0) {
+          await tx.servicoOrcado.createMany({
+            data: o.servicos.map((i) => ({
+              id: i.id,
+              orcamentoId: o.id,
+              servicoId: i.servicoId,
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              precoAplicado: i.precoAplicado,
+            })),
+          });
+        }
+        if (o.pecas.length > 0) {
+          await tx.pecaOrcada.createMany({
+            data: o.pecas.map((i) => ({
+              id: i.id,
+              orcamentoId: o.id,
+              pecaId: i.pecaId,
+              descricao: i.descricao,
+              quantidade: i.quantidade,
+              precoAplicado: i.precoAplicado,
+              situacao: i.situacao,
+            })),
+          });
+        }
       }
     });
   }
@@ -252,42 +232,33 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         em: h.em,
         por: h.por,
       })),
-      itensServico: r.itensServico.map((i) => ({
-        id: i.id,
-        servicoId: i.servicoId,
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        precoAplicado: Number(i.precoAplicado),
-        reparoId: i.reparoId,
+      orcamentos: r.orcamentos.map((o) => ({
+        id: o.id,
+        tipo: o.tipo as TipoOrcamento,
+        descricao: o.descricao,
+        totalServicos: Number(o.totalServicos),
+        totalPecas: Number(o.totalPecas),
+        total: Number(o.total),
+        status: o.status as StatusOrcamento,
+        criadoEm: o.criadoEm,
+        enviadoEm: o.enviadoEm,
+        respondidoEm: o.respondidoEm,
+        servicos: o.servicos.map((i) => ({
+          id: i.id,
+          servicoId: i.servicoId,
+          descricao: i.descricao,
+          quantidade: i.quantidade,
+          precoAplicado: Number(i.precoAplicado),
+        })),
+        pecas: o.pecas.map((i) => ({
+          id: i.id,
+          pecaId: i.pecaId,
+          descricao: i.descricao,
+          quantidade: i.quantidade,
+          precoAplicado: Number(i.precoAplicado),
+          situacao: i.situacao as SituacaoPecaOrcada,
+        })),
       })),
-      itensPeca: r.itensPeca.map((i) => ({
-        id: i.id,
-        pecaId: i.pecaId,
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        precoAplicado: Number(i.precoAplicado),
-        situacao: i.situacao as SituacaoItemPeca,
-        reparoId: i.reparoId,
-      })),
-      reparos: r.reparos.map((rep) => ({
-        id: rep.id,
-        descricao: rep.descricao,
-        total: Number(rep.total),
-        status: rep.status as StatusReparo,
-        criadoEm: rep.criadoEm,
-        respondidoEm: rep.respondidoEm,
-      })),
-      orcamento: r.orcamento
-        ? {
-            id: r.orcamento.id,
-            totalServicos: Number(r.orcamento.totalServicos),
-            totalPecas: Number(r.orcamento.totalPecas),
-            total: Number(r.orcamento.total),
-            status: r.orcamento.status as StatusOrcamento,
-            enviadoEm: r.orcamento.enviadoEm,
-            respondidoEm: r.orcamento.respondidoEm,
-          }
-        : null,
     });
   }
 }

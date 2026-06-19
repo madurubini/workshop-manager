@@ -2,7 +2,13 @@ import {
   ErroTransicaoInvalida,
   ErroValidacao,
 } from '../../compartilhado/erros/erros-dominio';
-import { SituacaoItemPeca, StatusOrcamento } from './itens';
+import {
+  PecaOrcada,
+  ServicoOrcado,
+  SituacaoPecaOrcada,
+  StatusOrcamento,
+  TipoOrcamento,
+} from './itens';
 import { OrdemServico } from './ordem-servico';
 import { StatusOS, transicaoPermitida } from './status-os';
 
@@ -100,35 +106,37 @@ describe('Máquina de estados da OS', () => {
   });
 });
 
-describe('OrdemServico.registrarDiagnostico', () => {
-  const itemServico = {
-    id: 'is1',
-    servicoId: 's1',
-    descricao: 'Troca de óleo',
-    quantidade: 2,
-    precoAplicado: 120,
-    reparoId: null,
-  };
-  const itemPeca = {
-    id: 'ip1',
-    pecaId: 'p1',
-    descricao: 'Filtro',
-    quantidade: 4,
-    precoAplicado: 35,
-    situacao: SituacaoItemPeca.DISPONIVEL,
-    reparoId: null,
-  };
+const servico = (over: Partial<ServicoOrcado> = {}): ServicoOrcado => ({
+  id: 'is1',
+  servicoId: 's1',
+  descricao: 'Serviço',
+  quantidade: 1,
+  precoAplicado: 100,
+  ...over,
+});
 
-  it('calcula os totais, gera orçamento GERADO e vai para Em diagnóstico', () => {
+const peca = (over: Partial<PecaOrcada> = {}): PecaOrcada => ({
+  id: 'ip1',
+  pecaId: 'p1',
+  descricao: 'Filtro',
+  quantidade: 2,
+  precoAplicado: 35,
+  situacao: SituacaoPecaOrcada.DISPONIVEL,
+  ...over,
+});
+
+describe('OrdemServico.registrarDiagnostico', () => {
+  it('calcula os totais, gera orçamento inicial GERADO e vai para Em diagnóstico', () => {
     const os = abrirOS();
     os.puxarEventos();
     os.registrarDiagnostico({
-      itensServico: [itemServico],
-      itensPeca: [itemPeca],
+      servicos: [servico({ quantidade: 2, precoAplicado: 120 })],
+      pecas: [peca({ quantidade: 4, precoAplicado: 35 })],
       orcamentoId: 'orc-1',
     });
 
     expect(os.status).toBe(StatusOS.EM_DIAGNOSTICO);
+    expect(os.orcamento?.tipo).toBe(TipoOrcamento.INICIAL);
     expect(os.orcamento?.totalServicos).toBe(240); // 2 * 120
     expect(os.orcamento?.totalPecas).toBe(140); // 4 * 35
     expect(os.orcamento?.total).toBe(380);
@@ -144,12 +152,11 @@ describe('OrdemServico.registrarDiagnostico', () => {
     const os = abrirOS();
     expect(() =>
       os.registrarDiagnostico({
-        itensServico: [],
-        itensPeca: [],
+        servicos: [],
+        pecas: [],
         orcamentoId: 'orc-1',
       }),
     ).toThrow(ErroValidacao);
-    // não pode ter mudado de status
     expect(os.status).toBe(StatusOS.RECEBIDA);
   });
 
@@ -158,47 +165,30 @@ describe('OrdemServico.registrarDiagnostico', () => {
     os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
     expect(() =>
       os.registrarDiagnostico({
-        itensServico: [itemServico],
-        itensPeca: [],
+        servicos: [servico()],
+        pecas: [],
         orcamentoId: 'orc-1',
       }),
     ).toThrow(ErroTransicaoInvalida);
   });
 });
 
-describe('Ciclo de vida do orçamento na OS', () => {
-  const itemServico = {
-    id: 'is1',
-    servicoId: 's1',
-    descricao: 'Serviço',
-    quantidade: 1,
-    precoAplicado: 100,
-    reparoId: null,
-  };
-  const pecaDisponivel = {
-    id: 'ip1',
-    pecaId: 'p1',
-    descricao: 'Filtro',
-    quantidade: 2,
-    precoAplicado: 35,
-    situacao: SituacaoItemPeca.DISPONIVEL,
-    reparoId: null,
-  };
-  const pecaCotada = {
+describe('Ciclo de vida do orçamento inicial', () => {
+  const pecaDisponivel = peca({ id: 'ip1', pecaId: 'p1', quantidade: 2 });
+  const pecaCotada = peca({
     id: 'ip2',
     pecaId: 'p2',
     descricao: 'Pastilha',
     quantidade: 1,
     precoAplicado: 198,
-    situacao: SituacaoItemPeca.EM_COTACAO,
-    reparoId: null,
-  };
+    situacao: SituacaoPecaOrcada.EM_COTACAO,
+  });
 
   function osComOrcamento(): OrdemServico {
     const os = abrirOS();
     os.registrarDiagnostico({
-      itensServico: [itemServico],
-      itensPeca: [pecaDisponivel, pecaCotada],
+      servicos: [servico()],
+      pecas: [pecaDisponivel, pecaCotada],
       orcamentoId: 'orc-1',
     });
     os.puxarEventos();
@@ -222,17 +212,19 @@ describe('Ciclo de vida do orçamento na OS', () => {
     expect(() => os.enviarOrcamento()).toThrow(ErroTransicaoInvalida);
   });
 
-  it('aprovar: ENVIADO → APROVADO, OS → Em execução, itens reservada/encomendada', () => {
+  it('aprovar: ENVIADO → APROVADO, OS → Em execução, peças reservada/encomendada', () => {
     const os = osComOrcamento();
     os.enviarOrcamento();
     os.puxarEventos();
 
-    os.aprovarOrcamento('cliente');
+    os.aprovarOrcamento('orc-1', 'cliente');
 
     expect(os.status).toBe(StatusOS.EM_EXECUCAO);
     expect(os.orcamento?.status).toBe(StatusOrcamento.APROVADO);
-    expect(os.itensPeca[0].situacao).toBe(SituacaoItemPeca.RESERVADA);
-    expect(os.itensPeca[1].situacao).toBe(SituacaoItemPeca.ENCOMENDADA);
+    expect(os.orcamento?.pecas[0].situacao).toBe(SituacaoPecaOrcada.RESERVADA);
+    expect(os.orcamento?.pecas[1].situacao).toBe(
+      SituacaoPecaOrcada.ENCOMENDADA,
+    );
 
     const aprovado = os
       .puxarEventos()
@@ -253,7 +245,7 @@ describe('Ciclo de vida do orçamento na OS', () => {
     os.enviarOrcamento();
     os.puxarEventos();
 
-    os.recusarOrcamento('Muito caro', 'cliente');
+    os.recusarOrcamento('orc-1', 'Muito caro', 'cliente');
 
     expect(os.status).toBe(StatusOS.CANCELADA);
     expect(os.orcamento?.status).toBe(StatusOrcamento.RECUSADO);
@@ -264,40 +256,31 @@ describe('Ciclo de vida do orçamento na OS', () => {
 
   it('não aprova um orçamento que não foi enviado', () => {
     const os = osComOrcamento(); // orçamento GERADO, não ENVIADO
-    expect(() => os.aprovarOrcamento()).toThrow(ErroTransicaoInvalida);
+    expect(() => os.aprovarOrcamento('orc-1')).toThrow(ErroTransicaoInvalida);
   });
 });
 
-describe('Execução e reparo adicional', () => {
-  const itemServico = {
-    id: 'is1',
-    servicoId: 's1',
-    descricao: 'Serviço',
-    quantidade: 1,
-    precoAplicado: 100,
-    reparoId: null,
-  };
-  const itemPeca = {
-    id: 'ip1',
-    pecaId: 'p1',
-    descricao: 'Filtro',
-    quantidade: 2,
-    precoAplicado: 35,
-    situacao: SituacaoItemPeca.DISPONIVEL,
-    reparoId: null,
-  };
-
+describe('Execução e orçamento adicional', () => {
   function osEmExecucao(): OrdemServico {
     const os = abrirOS();
     os.registrarDiagnostico({
-      itensServico: [itemServico],
-      itensPeca: [itemPeca],
+      servicos: [servico()],
+      pecas: [peca()],
       orcamentoId: 'orc-1',
     });
     os.enviarOrcamento();
-    os.aprovarOrcamento('cliente');
+    os.aprovarOrcamento('orc-1', 'cliente');
     os.puxarEventos();
     return os;
+  }
+
+  function adicional(os: OrdemServico): void {
+    os.adicionarOrcamentoAdicional({
+      id: 'orc-2',
+      descricao: 'Correia',
+      servicos: [servico({ id: 'is2', servicoId: 's2', precoAplicado: 80 })],
+      pecas: [],
+    });
   }
 
   it('marca o início da execução ao aprovar', () => {
@@ -316,104 +299,64 @@ describe('Execução e reparo adicional', () => {
     );
   });
 
-  it('lançar reparo: atualiza o orçamento e fica AGUARDANDO', () => {
+  it('lançar adicional: cria orçamento ADICIONAL ENVIADO, OS segue em execução', () => {
     const os = osEmExecucao();
-    const totalAntes = os.orcamento!.total; // 100 + 70 = 170
-    os.adicionarReparo({
-      id: 'rep-1',
-      descricao: 'Correia',
-      itensServico: [
-        {
-          id: 'is2',
-          servicoId: 's2',
-          descricao: 'Troca correia',
-          quantidade: 1,
-          precoAplicado: 80,
-          reparoId: null,
-        },
-      ],
-      itensPeca: [],
-    });
-    expect(os.reparos).toHaveLength(1);
-    expect(os.orcamento!.total).toBe(totalAntes + 80);
-    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
-      'ordem-servico.reparo-adicional-lancado',
-    );
+    adicional(os);
+    expect(os.orcamentos).toHaveLength(2);
+    const orc2 = os.orcamentos.find((o) => o.id === 'orc-2')!;
+    expect(orc2.tipo).toBe(TipoOrcamento.ADICIONAL);
+    expect(orc2.status).toBe(StatusOrcamento.ENVIADO);
+    expect(orc2.total).toBe(80);
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    const nomes = os.puxarEventos().map((e) => e.nomeEvento);
+    expect(nomes).toContain('ordem-servico.orcamento-gerado');
+    expect(nomes).toContain('ordem-servico.orcamento-enviado');
   });
 
-  it('não conclui execução com reparo aguardando', () => {
+  it('não conclui execução com orçamento adicional aguardando', () => {
     const os = osEmExecucao();
-    os.adicionarReparo({
-      id: 'rep-1',
-      descricao: 'X',
-      itensServico: [
-        {
-          id: 'is2',
-          servicoId: 's2',
-          descricao: 'X',
-          quantidade: 1,
-          precoAplicado: 80,
-          reparoId: null,
-        },
-      ],
-      itensPeca: [],
-    });
+    adicional(os);
     expect(() => os.concluirExecucao()).toThrow(ErroValidacao);
     expect(os.status).toBe(StatusOS.EM_EXECUCAO);
   });
 
-  it('recusar reparo: remove seus itens e volta o total; depois conclui', () => {
+  it('recusar adicional: marca RECUSADO e depois conclui (inicial intacto)', () => {
     const os = osEmExecucao();
-    const totalAntes = os.orcamento!.total;
-    os.adicionarReparo({
-      id: 'rep-1',
-      descricao: 'X',
-      itensServico: [
-        {
-          id: 'is2',
-          servicoId: 's2',
-          descricao: 'X',
-          quantidade: 1,
-          precoAplicado: 80,
-          reparoId: null,
-        },
-      ],
-      itensPeca: [],
-    });
-    os.recusarReparo('rep-1');
-    expect(os.orcamento!.total).toBe(totalAntes);
-    expect(os.itensServico.filter((i) => i.reparoId === 'rep-1')).toHaveLength(
-      0,
-    );
-    // sem reparo pendente, agora conclui
+    const totalInicial = os.orcamento!.total;
+    adicional(os);
+    os.recusarOrcamento('orc-2');
+    const orc2 = os.orcamentos.find((o) => o.id === 'orc-2')!;
+    expect(orc2.status).toBe(StatusOrcamento.RECUSADO);
+    expect(os.orcamento!.total).toBe(totalInicial);
     os.concluirExecucao();
     expect(os.status).toBe(StatusOS.FINALIZADA);
   });
 
-  it('aprovar reparo: peças do reparo viram RESERVADA e emite reparo-aprovado', () => {
+  it('aprovar adicional: peças viram RESERVADA, emite orcamento-aprovado, OS segue', () => {
     const os = osEmExecucao();
-    os.adicionarReparo({
-      id: 'rep-1',
-      descricao: 'X',
-      itensServico: [],
-      itensPeca: [
-        {
+    os.adicionarOrcamentoAdicional({
+      id: 'orc-2',
+      descricao: 'Correia',
+      servicos: [],
+      pecas: [
+        peca({
           id: 'ip2',
           pecaId: 'p2',
           descricao: 'Correia',
           quantidade: 1,
           precoAplicado: 50,
-          situacao: SituacaoItemPeca.DISPONIVEL,
-          reparoId: null,
-        },
+          situacao: SituacaoPecaOrcada.DISPONIVEL,
+        }),
       ],
     });
     os.puxarEventos();
-    os.aprovarReparo('rep-1');
-    const itemReparo = os.itensPeca.find((i) => i.reparoId === 'rep-1');
-    expect(itemReparo?.situacao).toBe(SituacaoItemPeca.RESERVADA);
+    os.aprovarOrcamento('orc-2');
+    const orc2 = os.orcamentos.find((o) => o.id === 'orc-2')!;
+    expect(orc2.pecas[0].situacao).toBe(SituacaoPecaOrcada.RESERVADA);
+    expect(orc2.status).toBe(StatusOrcamento.APROVADO);
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
     expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
-      'ordem-servico.reparo-aprovado',
+      'ordem-servico.orcamento-aprovado',
     );
   });
 });
@@ -422,21 +365,12 @@ describe('Pagamento e entrega', () => {
   function osFinalizada(): OrdemServico {
     const os = abrirOS();
     os.registrarDiagnostico({
-      itensServico: [
-        {
-          id: 'is1',
-          servicoId: 's1',
-          descricao: 'S',
-          quantidade: 1,
-          precoAplicado: 100,
-          reparoId: null,
-        },
-      ],
-      itensPeca: [],
+      servicos: [servico()],
+      pecas: [],
       orcamentoId: 'orc-1',
     });
     os.enviarOrcamento();
-    os.aprovarOrcamento('cliente');
+    os.aprovarOrcamento('orc-1', 'cliente');
     os.concluirExecucao('mecanico');
     os.puxarEventos();
     return os;

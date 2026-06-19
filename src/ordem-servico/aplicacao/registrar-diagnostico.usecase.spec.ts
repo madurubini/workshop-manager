@@ -3,7 +3,7 @@ import {
   ErroNaoEncontrado,
   ErroTransicaoInvalida,
 } from '../../compartilhado/erros/erros-dominio';
-import { SituacaoItemPeca, StatusOrcamento } from '../dominio/itens';
+import { SituacaoPecaOrcada, StatusOrcamento } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { StatusOS } from '../dominio/status-os';
 import { OrdemServicoRepository } from '../dominio/repositorios';
@@ -45,7 +45,6 @@ describe('RegistrarDiagnostico', () => {
           descricao: 'Troca de óleo',
           quantidade: 1,
           precoAplicado: 120,
-          reparoId: null,
         },
       ]),
       montarPecas: jest.fn().mockResolvedValue([
@@ -55,8 +54,7 @@ describe('RegistrarDiagnostico', () => {
           descricao: 'Filtro',
           quantidade: 4,
           precoAplicado: 35,
-          situacao: SituacaoItemPeca.DISPONIVEL,
-          reparoId: null,
+          situacao: SituacaoPecaOrcada.DISPONIVEL,
         },
       ]),
     };

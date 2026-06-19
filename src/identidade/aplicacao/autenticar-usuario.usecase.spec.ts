@@ -22,8 +22,8 @@ describe('AutenticarUsuario', () => {
   let usecase: AutenticarUsuario;
 
   beforeEach(() => {
-    repo = { buscarPorUsername: jest.fn() };
-    hash = { comparar: jest.fn() };
+    repo = { buscarPorUsername: jest.fn(), inserir: jest.fn() };
+    hash = { comparar: jest.fn(), gerar: jest.fn() };
     token = {
       gerar: jest
         .fn()

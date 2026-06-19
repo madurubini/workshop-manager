@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AutenticarUsuario } from './aplicacao/autenticar-usuario.usecase';
+import { CadastrarUsuario } from './aplicacao/cadastrar-usuario.usecase';
 import { BcryptHashDeSenha } from './infraestrutura/bcrypt-hash-de-senha';
 import { JwtGeradorDeToken } from './infraestrutura/jwt-gerador-de-token';
 import { JwtStrategy } from './infraestrutura/jwt.strategy';
@@ -13,6 +14,8 @@ import {
   USUARIO_REPOSITORY,
 } from './dominio/portas';
 import { AuthController } from './interfaces/auth.controller';
+import { PapeisGuard } from './interfaces/papeis.guard';
+import { UsuariosController } from './interfaces/usuarios.controller';
 
 /**
  * Contexto Identidade e Acesso (transversal às rotas administrativas).
@@ -33,10 +36,12 @@ import { AuthController } from './interfaces/auth.controller';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UsuariosController],
   providers: [
     AutenticarUsuario,
+    CadastrarUsuario,
     JwtStrategy,
+    PapeisGuard,
     { provide: USUARIO_REPOSITORY, useClass: PrismaUsuarioRepository },
     { provide: HASH_DE_SENHA, useClass: BcryptHashDeSenha },
     { provide: GERADOR_DE_TOKEN, useClass: JwtGeradorDeToken },

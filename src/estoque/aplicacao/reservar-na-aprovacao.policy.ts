@@ -1,10 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 // Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
-import type {
-  OrcamentoAprovado,
-  ReparoAprovado,
-} from '../../ordem-servico/dominio/eventos';
+import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
 import { FORNECEDOR, Fornecedor } from '../dominio/fornecedor';
 import {
   PECA_REPOSITORY,
@@ -32,14 +29,10 @@ export class ReservarNaAprovacao {
     private readonly fornecedor: Fornecedor,
   ) {}
 
+  // Vale para o orçamento INICIAL e os ADICIONAIS: ambos chegam aqui pelo
+  // mesmo evento `orcamento-aprovado`, com as peças daquele orçamento.
   @OnEvent('ordem-servico.orcamento-aprovado')
   async aoAprovarOrcamento(evento: OrcamentoAprovado): Promise<void> {
-    await this.reservarOuEncomendar(evento.ordemId, evento.itensPeca);
-  }
-
-  // Reparo aprovado reserva/encomenda exatamente como a aprovação do orçamento.
-  @OnEvent('ordem-servico.reparo-aprovado')
-  async aoAprovarReparo(evento: ReparoAprovado): Promise<void> {
     await this.reservarOuEncomendar(evento.ordemId, evento.itensPeca);
   }
 

@@ -10,17 +10,13 @@ import {
   EntregarVeiculo,
 } from './aplicacao/entrega.usecases';
 import { EnviarOrcamento } from './aplicacao/enviar-orcamento.usecase';
+import { LancarOrcamentoAdicional } from './aplicacao/lancar-orcamento-adicional.usecase';
 import { MontadorDeItens } from './aplicacao/montador-de-itens.service';
 import { ORDEM_SERVICO_CONSULTA } from './aplicacao/ordem-servico-consulta.api';
 import { OrdemServicoConsultaService } from './aplicacao/ordem-servico-consulta.service';
 import { RecusarOrcamento } from './aplicacao/recusar-orcamento.usecase';
 import { RegistrarDiagnostico } from './aplicacao/registrar-diagnostico.usecase';
-import { RegistrarReparoAdicional } from './aplicacao/registrar-reparo-adicional.usecase';
 import { RelatorioTempoMedioExecucao } from './aplicacao/relatorio-tempo-medio.usecase';
-import {
-  AprovarReparoAdicional,
-  RecusarReparoAdicional,
-} from './aplicacao/responder-reparo.usecases';
 import { ORDEM_SERVICO_REPOSITORY } from './dominio/repositorios';
 import { PrismaOrdemServicoRepository } from './infraestrutura/prisma-ordem-servico.repository';
 import { AcompanhamentoController } from './interfaces/acompanhamento.controller';
@@ -49,9 +45,7 @@ import { RelatoriosController } from './interfaces/relatorios.controller';
     AprovarOrcamento,
     RecusarOrcamento,
     ConcluirExecucao,
-    RegistrarReparoAdicional,
-    AprovarReparoAdicional,
-    RecusarReparoAdicional,
+    LancarOrcamentoAdicional,
     ConfirmarPagamento,
     EntregarVeiculo,
     RelatorioTempoMedioExecucao,

@@ -1,7 +1,7 @@
 /**
  * Porta para o sistema externo Serviço de Notificações (SE). Avisa o cliente
- * sobre orçamento, reparo adicional e retirada do veículo. Como é uma porta, o
- * canal real (app/e-mail/SMS) pode mudar sem afetar o domínio.
+ * sobre orçamento (inicial e adicional) e retirada do veículo. Como é uma
+ * porta, o canal real (app/e-mail/SMS) pode mudar sem afetar o domínio.
  */
 export const NOTIFICADOR = Symbol('Notificador');
 
@@ -10,8 +10,8 @@ export type TipoNotificacao =
   | 'ORCAMENTO_APROVADO'
   | 'ORCAMENTO_RECUSADO'
   | 'LEMBRETE_APROVACAO'
-  | 'REPARO_LANCADO'
-  | 'LEMBRETE_REPARO'
+  | 'ORCAMENTO_ADICIONAL_ENVIADO'
+  | 'LEMBRETE_ORCAMENTO_ADICIONAL'
   | 'VEICULO_PRONTO'
   | 'VEICULO_ENTREGUE';
 

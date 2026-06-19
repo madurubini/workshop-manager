@@ -13,24 +13,17 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AprovarOrcamento } from '../aplicacao/aprovar-orcamento.usecase';
 import { RecusarOrcamento } from '../aplicacao/recusar-orcamento.usecase';
 import {
-  AprovarReparoAdicional,
-  RecusarReparoAdicional,
-} from '../aplicacao/responder-reparo.usecases';
-import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
 } from '../dominio/repositorios';
-import {
-  AcompanhamentoRespostaDto,
-  RespostaOrcamentoDto,
-  RespostaReparoDto,
-} from './dtos';
+import { AcompanhamentoRespostaDto, RespostaOrcamentoDto } from './dtos';
 
 /**
  * Acompanhamento do cliente (app). Rotas PÚBLICAS — sem JWT: o acesso é pelo id
  * da OS (o link enviado ao cliente funciona como token da OS, no MVP).
  *
- * O endpoint de resposta ao orçamento roteia para DOIS casos de uso distintos
+ * O cliente responde a CADA orçamento pelo id (o inicial e os adicionais usam o
+ * mesmo endpoint). O controller roteia para DOIS casos de uso distintos
  * (Aprovar / Recusar) conforme `{ aprovado }`, como pede o contrato.
  */
 @ApiTags('Acompanhamento do cliente')
@@ -39,14 +32,12 @@ export class AcompanhamentoController {
   constructor(
     private readonly aprovarOrcamento: AprovarOrcamento,
     private readonly recusarOrcamento: RecusarOrcamento,
-    private readonly aprovarReparo: AprovarReparoAdicional,
-    private readonly recusarReparo: RecusarReparoAdicional,
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
   ) {}
 
   @Get(':osId')
-  @ApiOperation({ summary: 'Consulta pública: status, orçamento e histórico' })
+  @ApiOperation({ summary: 'Consulta pública: status, orçamentos e histórico' })
   async consultar(
     @Param('osId') osId: string,
   ): Promise<AcompanhamentoRespostaDto> {
@@ -57,39 +48,29 @@ export class AcompanhamentoController {
     return AcompanhamentoRespostaDto.de(ordem);
   }
 
-  @Post(':osId/orcamento/resposta')
+  @Post(':osId/orcamentos/:orcamentoId/resposta')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Cliente aprova ou recusa o orçamento (roteia para dois casos de uso)',
+      'Cliente aprova ou recusa um orçamento (inicial ou adicional; roteia para dois casos de uso)',
   })
   async responder(
     @Param('osId') osId: string,
+    @Param('orcamentoId') orcamentoId: string,
     @Body() dto: RespostaOrcamentoDto,
   ): Promise<AcompanhamentoRespostaDto> {
     const ordem = dto.aprovado
-      ? await this.aprovarOrcamento.executar({ ordemId: osId, por: 'cliente' })
+      ? await this.aprovarOrcamento.executar({
+          ordemId: osId,
+          orcamentoId,
+          por: 'cliente',
+        })
       : await this.recusarOrcamento.executar({
           ordemId: osId,
+          orcamentoId,
           justificativa: dto.justificativa,
           por: 'cliente',
         });
-    return AcompanhamentoRespostaDto.de(ordem);
-  }
-
-  @Post(':osId/reparos-adicionais/:reparoId/resposta')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Cliente autoriza ou recusa um reparo adicional',
-  })
-  async responderReparo(
-    @Param('osId') osId: string,
-    @Param('reparoId') reparoId: string,
-    @Body() dto: RespostaReparoDto,
-  ): Promise<AcompanhamentoRespostaDto> {
-    const ordem = dto.aprovado
-      ? await this.aprovarReparo.executar({ ordemId: osId, reparoId })
-      : await this.recusarReparo.executar({ ordemId: osId, reparoId });
     return AcompanhamentoRespostaDto.de(ordem);
   }
 }

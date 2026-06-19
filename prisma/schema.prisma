@@ -1,7 +1,9 @@
 // schema.prisma — Sistema de Oficina (MVP, Fase 1)
-// Postgres. Reflete os 3 agregados: Clientes e Veículos, Ordem de Serviço (com Orçamento), Estoque.
-// Decisões aplicadas: preço congelado nos itens, histórico de status, versão (optimistic lock),
+// Postgres. Reflete os 3 agregados: Clientes e Veículos, Ordem de Serviço (com Orçamentos), Estoque.
+// Decisões aplicadas: preço congelado nos itens orçados, histórico de status, versão (optimistic lock),
 // soft delete nos cadastros, reserva como registro explícito, dinheiro em Decimal.
+// Uma OS pode ter VÁRIOS orçamentos: 1 INICIAL (do diagnóstico) + N ADICIONAL (reparos
+// descobertos durante a execução). Cada orçamento é aprovado/recusado de forma independente.
 
 generator client {
   provider = "prisma-client-js"
@@ -69,7 +71,7 @@ model Servico {
   precoBase Decimal  @db.Decimal(10, 2)
   ativo     Boolean  @default(true)
 
-  itens ItemServico[]
+  orcados ServicoOrcado[]
 
   @@map("servico")
 }
@@ -86,7 +88,7 @@ model Peca {
   ativo         Boolean  @default(true)
   // disponivel é derivado; pode virar uma coluna gerada no Postgres se preferir
 
-  itens    ItemPeca[]
+  orcados  PecaOrcada[]
   reservas ReservaEstoque[]
   cotacoes Cotacao[]
 
@@ -142,13 +144,10 @@ model OrdemServico {
 
   cliente    Cliente         @relation(fields: [clienteId], references: [id])
   veiculo    Veiculo         @relation(fields: [veiculoId], references: [id])
-  orcamento  Orcamento?
-  itensServico ItemServico[]
-  itensPeca    ItemPeca[]
-  reparos      ReparoAdicional[]
-  historico    HistoricoStatus[]
-  reservas     ReservaEstoque[]
-  cotacoes     Cotacao[]
+  orcamentos Orcamento[]
+  historico  HistoricoStatus[]
+  reservas   ReservaEstoque[]
+  cotacoes   Cotacao[]
 
   @@index([clienteId])
   @@index([veiculoId])
@@ -156,74 +155,61 @@ model OrdemServico {
   @@map("ordem_servico")
 }
 
-// Orçamento é entidade interna da OS (1:1). Aprová-lo/recusá-lo muda o status da OS.
+// Orçamento da OS. Pode haver vários: 1 INICIAL (diagnóstico) + N ADICIONAL (reparos).
+// Aprovar/recusar o INICIAL move o status da OS; os ADICIONAL não mudam o status,
+// apenas liberam (ou não) a execução do trabalho extra.
 model Orcamento {
   id            String    @id @default(uuid()) @db.Uuid
-  ordemId       String    @unique @db.Uuid
+  ordemId       String    @db.Uuid
+  tipo          String    @default("INICIAL") // INICIAL | ADICIONAL
+  descricao     String? // motivo do orçamento adicional (null no inicial)
   totalServicos Decimal   @db.Decimal(10, 2)
   totalPecas    Decimal   @db.Decimal(10, 2)
   total         Decimal   @db.Decimal(10, 2)
   status        String    @default("GERADO") // GERADO | ENVIADO | APROVADO | RECUSADO
+  criadoEm      DateTime  @default(now())
   enviadoEm     DateTime?
   respondidoEm  DateTime?
 
-  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+  ordem    OrdemServico    @relation(fields: [ordemId], references: [id])
+  servicos ServicoOrcado[]
+  pecas    PecaOrcada[]
 
+  @@index([ordemId])
   @@map("orcamento")
 }
 
-// Item de serviço com PREÇO CONGELADO no momento da geração do orçamento.
-model ItemServico {
+// Linha de serviço do orçamento, com PREÇO CONGELADO no momento da geração.
+model ServicoOrcado {
   id            String  @id @default(uuid()) @db.Uuid
-  ordemId       String  @db.Uuid
+  orcamentoId   String  @db.Uuid
   servicoId     String  @db.Uuid
   descricao     String // snapshot do nome
   quantidade    Int     @default(1)
-  precoAplicado Decimal @db.Decimal(10, 2)
-  reparoId      String? @db.Uuid // se veio de um reparo adicional
+  precoAplicado Decimal @db.Decimal(10, 2) // congelado
 
-  ordem   OrdemServico     @relation(fields: [ordemId], references: [id])
-  servico Servico          @relation(fields: [servicoId], references: [id])
-  reparo  ReparoAdicional? @relation(fields: [reparoId], references: [id])
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id])
+  servico   Servico   @relation(fields: [servicoId], references: [id])
 
-  @@index([ordemId])
-  @@map("item_servico")
+  @@index([orcamentoId])
+  @@map("servico_orcado")
 }
 
-// Item de peça com preço congelado e situação no estoque.
-model ItemPeca {
+// Linha de peça do orçamento, com preço congelado e situação no estoque.
+model PecaOrcada {
   id            String  @id @default(uuid()) @db.Uuid
-  ordemId       String  @db.Uuid
+  orcamentoId   String  @db.Uuid
   pecaId        String  @db.Uuid
   descricao     String
   quantidade    Int
-  precoAplicado Decimal @db.Decimal(10, 2)
+  precoAplicado Decimal @db.Decimal(10, 2) // congelado
   situacao      String  @default("PENDENTE") // PENDENTE | DISPONIVEL | EM_COTACAO | ENCOMENDADA | RESERVADA
-  reparoId      String? @db.Uuid
 
-  ordem  OrdemServico     @relation(fields: [ordemId], references: [id])
-  peca   Peca             @relation(fields: [pecaId], references: [id])
-  reparo ReparoAdicional? @relation(fields: [reparoId], references: [id])
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id])
+  peca      Peca      @relation(fields: [pecaId], references: [id])
 
-  @@index([ordemId])
-  @@map("item_peca")
-}
-
-model ReparoAdicional {
-  id           String    @id @default(uuid()) @db.Uuid
-  ordemId      String    @db.Uuid
-  descricao    String
-  total        Decimal   @db.Decimal(10, 2)
-  status       String    @default("AGUARDANDO") // AGUARDANDO | APROVADO | RECUSADO
-  criadoEm     DateTime  @default(now())
-  respondidoEm DateTime?
-
-  ordem        OrdemServico  @relation(fields: [ordemId], references: [id])
-  itensServico ItemServico[]
-  itensPeca    ItemPeca[]
-
-  @@index([ordemId])
-  @@map("reparo_adicional")
+  @@index([orcamentoId])
+  @@map("peca_orcada")
 }
 
 // Foto de cada transição de status — atende o acompanhamento e a auditoria.

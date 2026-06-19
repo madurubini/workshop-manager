@@ -28,8 +28,8 @@ import {
   EntregarVeiculo,
 } from '../aplicacao/entrega.usecases';
 import { EnviarOrcamento } from '../aplicacao/enviar-orcamento.usecase';
+import { LancarOrcamentoAdicional } from '../aplicacao/lancar-orcamento-adicional.usecase';
 import { RegistrarDiagnostico } from '../aplicacao/registrar-diagnostico.usecase';
-import { RegistrarReparoAdicional } from '../aplicacao/registrar-reparo-adicional.usecase';
 import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
@@ -38,10 +38,10 @@ import { StatusOS } from '../dominio/status-os';
 import {
   AbrirOrdemServicoDto,
   DiagnosticoRespostaDto,
+  LancarOrcamentoAdicionalDto,
   OrdemServicoRespostaDto,
   PagamentoDto,
   RegistrarDiagnosticoDto,
-  RegistrarReparoAdicionalDto,
 } from './dtos';
 
 @ApiTags('Ordens de Serviço')
@@ -54,7 +54,7 @@ export class OrdensServicoController {
     private readonly registrarDiagnostico: RegistrarDiagnostico,
     private readonly enviarOrcamento: EnviarOrcamento,
     private readonly concluirExecucao: ConcluirExecucao,
-    private readonly registrarReparoAdicional: RegistrarReparoAdicional,
+    private readonly lancarOrcamentoAdicional: LancarOrcamentoAdicional,
     private readonly confirmarPagamento: ConfirmarPagamento,
     private readonly entregarVeiculo: EntregarVeiculo,
     @Inject(ORDEM_SERVICO_REPOSITORY)
@@ -151,17 +151,17 @@ export class OrdensServicoController {
     return OrdemServicoRespostaDto.de(ordem);
   }
 
-  @Post(':id/reparos-adicionais')
+  @Post(':id/orcamentos-adicionais')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary:
-      'Lança um reparo adicional (atualiza o orçamento, notifica o cliente)',
+      'Lança um orçamento adicional durante a execução (envia ao cliente para autorizar)',
   })
-  async lancarReparo(
+  async lancarOrcamentoAdicionalEndpoint(
     @Param('id') id: string,
-    @Body() dto: RegistrarReparoAdicionalDto,
+    @Body() dto: LancarOrcamentoAdicionalDto,
   ): Promise<OrdemServicoRespostaDto> {
-    const ordem = await this.registrarReparoAdicional.executar({
+    const ordem = await this.lancarOrcamentoAdicional.executar({
       ordemId: id,
       descricao: dto.descricao,
       servicos: dto.servicos ?? [],

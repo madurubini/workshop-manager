@@ -78,18 +78,18 @@ describe('ReenviarPendentes (cliente sem resposta)', () => {
   beforeEach(() => {
     consulta = {
       listarAguardandoResposta: jest.fn().mockResolvedValue([]),
-      listarReparosAguardando: jest.fn().mockResolvedValue([]),
+      listarOrcamentosAdicionaisAguardando: jest.fn().mockResolvedValue([]),
     };
     notificador = { notificar: jest.fn() };
     policy = new ReenviarPendentes(consulta, notificador);
   });
 
-  it('reenvia lembrete para orçamentos e reparos aguardando', async () => {
+  it('reenvia lembrete para orçamentos inicial e adicional aguardando', async () => {
     consulta.listarAguardandoResposta.mockResolvedValue([
       { ordemId: 'os-1', numero: 'OS-1' },
     ]);
-    consulta.listarReparosAguardando.mockResolvedValue([
-      { ordemId: 'os-2', numero: 'OS-2', reparoId: 'rep-1' },
+    consulta.listarOrcamentosAdicionaisAguardando.mockResolvedValue([
+      { ordemId: 'os-2', numero: 'OS-2', orcamentoId: 'orc-2' },
     ]);
 
     await policy.reenviar();
@@ -98,7 +98,7 @@ describe('ReenviarPendentes (cliente sem resposta)', () => {
       expect.objectContaining({ tipo: 'LEMBRETE_APROVACAO' }),
     );
     expect(notificador.notificar).toHaveBeenCalledWith(
-      expect.objectContaining({ tipo: 'LEMBRETE_REPARO' }),
+      expect.objectContaining({ tipo: 'LEMBRETE_ORCAMENTO_ADICIONAL' }),
     );
   });
 

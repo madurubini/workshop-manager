@@ -13,13 +13,13 @@ import {
 import { MontadorDeItens } from './montador-de-itens.service';
 
 /**
- * Caso de uso: lançar um reparo adicional durante a execução. Reaproveita o
- * MontadorDeItens (mesmo congelamento de preço e verificação de estoque do
- * diagnóstico). A OS atualiza o orçamento e emite o evento que pede autorização
- * ao cliente.
+ * Caso de uso: lançar um orçamento ADICIONAL durante a execução (o antigo
+ * "reparo adicional"). Reaproveita o MontadorDeItens (mesmo congelamento de
+ * preço e verificação de estoque do diagnóstico). A OS cria o novo orçamento já
+ * enviado e emite o evento que pede autorização ao cliente.
  */
 @Injectable()
-export class RegistrarReparoAdicional {
+export class LancarOrcamentoAdicional {
   constructor(
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
@@ -41,22 +41,17 @@ export class RegistrarReparoAdicional {
       });
     }
 
-    const reparoId = randomUUID();
-    const itensServico = await this.montador.montarServicos(
-      entrada.servicos,
-      reparoId,
-    );
-    const itensPeca = await this.montador.montarPecas(
+    const servicos = await this.montador.montarServicos(entrada.servicos);
+    const pecas = await this.montador.montarPecas(
       entrada.ordemId,
       entrada.pecas,
-      reparoId,
     );
 
-    ordem.adicionarReparo({
-      id: reparoId,
+    ordem.adicionarOrcamentoAdicional({
+      id: randomUUID(),
       descricao: entrada.descricao,
-      itensServico,
-      itensPeca,
+      servicos,
+      pecas,
     });
 
     await this.ordens.atualizar(ordem);

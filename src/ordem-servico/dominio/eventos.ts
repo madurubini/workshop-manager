@@ -1,4 +1,5 @@
 import { EventoDominio } from '../../compartilhado/dominio/evento-dominio';
+import type { TipoOrcamento } from './itens';
 import { StatusOS } from './status-os';
 
 /**
@@ -52,11 +53,12 @@ export class DiagnosticoConcluido extends EventoDominio {
   }
 }
 
-/** Orçamento gerado a partir do diagnóstico (ainda não enviado). */
+/** Orçamento gerado (inicial no diagnóstico, ou adicional na execução). */
 export class OrcamentoGerado extends EventoDominio {
   constructor(
     readonly ordemId: string,
     readonly orcamentoId: string,
+    readonly tipo: TipoOrcamento,
     readonly total: number,
   ) {
     super();
@@ -66,11 +68,13 @@ export class OrcamentoGerado extends EventoDominio {
   }
 }
 
-/** Orçamento enviado ao cliente (→ notificacoes avisa o cliente). */
+/** Orçamento enviado ao cliente (→ notificacoes avisa/pede autorização). */
 export class OrcamentoEnviado extends EventoDominio {
   constructor(
     readonly ordemId: string,
     readonly numero: string,
+    readonly orcamentoId: string,
+    readonly tipo: TipoOrcamento,
   ) {
     super();
   }
@@ -81,11 +85,13 @@ export class OrcamentoEnviado extends EventoDominio {
 
 /**
  * Orçamento aprovado pelo cliente (→ estoque reserva disponíveis e encomenda
- * faltantes). Carrega os itens de peça com a situação do diagnóstico.
+ * faltantes). Carrega as peças do orçamento com a situação do diagnóstico.
  */
 export class OrcamentoAprovado extends EventoDominio {
   constructor(
     readonly ordemId: string,
+    readonly orcamentoId: string,
+    readonly tipo: TipoOrcamento,
     readonly itensPeca: ItemPecaAprovado[],
   ) {
     super();
@@ -95,10 +101,15 @@ export class OrcamentoAprovado extends EventoDominio {
   }
 }
 
-/** Orçamento recusado pelo cliente (→ OS cancelada; notificacoes avisa). */
+/**
+ * Orçamento recusado pelo cliente. Se for o INICIAL → OS cancelada; se for
+ * ADICIONAL → segue só com o que foi aprovado (notificacoes avisa conforme o tipo).
+ */
 export class OrcamentoRecusado extends EventoDominio {
   constructor(
     readonly ordemId: string,
+    readonly orcamentoId: string,
+    readonly tipo: TipoOrcamento,
     readonly justificativa: string | null,
   ) {
     super();
@@ -118,46 +129,6 @@ export class ExecucaoConcluida extends EventoDominio {
   }
   get nomeEvento(): string {
     return 'ordem-servico.execucao-concluida';
-  }
-}
-
-/** Reparo adicional lançado (→ notificacoes pede autorização ao cliente). */
-export class ReparoAdicionalLancado extends EventoDominio {
-  constructor(
-    readonly ordemId: string,
-    readonly reparoId: string,
-  ) {
-    super();
-  }
-  get nomeEvento(): string {
-    return 'ordem-servico.reparo-adicional-lancado';
-  }
-}
-
-/** Reparo aprovado (→ estoque reserva/encomenda as peças do reparo). */
-export class ReparoAprovado extends EventoDominio {
-  constructor(
-    readonly ordemId: string,
-    readonly reparoId: string,
-    readonly itensPeca: ItemPecaAprovado[],
-  ) {
-    super();
-  }
-  get nomeEvento(): string {
-    return 'ordem-servico.reparo-aprovado';
-  }
-}
-
-/** Reparo recusado (→ segue só com o que foi aprovado). */
-export class ReparoRecusado extends EventoDominio {
-  constructor(
-    readonly ordemId: string,
-    readonly reparoId: string,
-  ) {
-    super();
-  }
-  get nomeEvento(): string {
-    return 'ordem-servico.reparo-recusado';
   }
 }
 

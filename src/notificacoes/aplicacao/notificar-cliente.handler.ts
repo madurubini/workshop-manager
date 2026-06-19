@@ -6,7 +6,6 @@ import type {
   OrcamentoAprovado,
   OrcamentoEnviado,
   OrcamentoRecusado,
-  ReparoAdicionalLancado,
   VeiculoEntregue,
 } from '../../ordem-servico/dominio/eventos';
 import { NOTIFICADOR, Notificador } from '../dominio/notificador';
@@ -25,38 +24,37 @@ export class NotificarCliente {
 
   @OnEvent('ordem-servico.orcamento-enviado')
   async aoEnviar(evento: OrcamentoEnviado): Promise<void> {
+    const adicional = (evento.tipo as string) === 'ADICIONAL';
     await this.notificador.notificar({
       ordemId: evento.ordemId,
-      tipo: 'ORCAMENTO_ENVIADO',
-      mensagem: `Seu orçamento da OS ${evento.numero} está pronto. Aprove ou recuse pelo aplicativo.`,
+      tipo: adicional ? 'ORCAMENTO_ADICIONAL_ENVIADO' : 'ORCAMENTO_ENVIADO',
+      mensagem: adicional
+        ? `Identificamos um reparo adicional na OS ${evento.numero}. Autorize ou recuse pelo aplicativo.`
+        : `Seu orçamento da OS ${evento.numero} está pronto. Aprove ou recuse pelo aplicativo.`,
     });
   }
 
   @OnEvent('ordem-servico.orcamento-aprovado')
   async aoAprovar(evento: OrcamentoAprovado): Promise<void> {
+    const adicional = (evento.tipo as string) === 'ADICIONAL';
     await this.notificador.notificar({
       ordemId: evento.ordemId,
       tipo: 'ORCAMENTO_APROVADO',
-      mensagem: 'Orçamento aprovado. Seu veículo entrou em execução.',
+      mensagem: adicional
+        ? 'Reparo adicional aprovado. Vamos executá-lo também.'
+        : 'Orçamento aprovado. Seu veículo entrou em execução.',
     });
   }
 
   @OnEvent('ordem-servico.orcamento-recusado')
   async aoRecusar(evento: OrcamentoRecusado): Promise<void> {
+    const adicional = (evento.tipo as string) === 'ADICIONAL';
     await this.notificador.notificar({
       ordemId: evento.ordemId,
       tipo: 'ORCAMENTO_RECUSADO',
-      mensagem: 'Orçamento recusado. A OS foi cancelada.',
-    });
-  }
-
-  @OnEvent('ordem-servico.reparo-adicional-lancado')
-  async aoLancarReparo(evento: ReparoAdicionalLancado): Promise<void> {
-    await this.notificador.notificar({
-      ordemId: evento.ordemId,
-      tipo: 'REPARO_LANCADO',
-      mensagem:
-        'Identificamos um reparo adicional. Autorize ou recuse pelo aplicativo.',
+      mensagem: adicional
+        ? 'Reparo adicional recusado. Seguiremos sem esse serviço.'
+        : 'Orçamento recusado. A OS foi cancelada.',
     });
   }
 

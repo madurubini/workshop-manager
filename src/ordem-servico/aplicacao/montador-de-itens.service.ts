@@ -6,10 +6,14 @@ import {
 } from '../../catalogo-servicos/aplicacao/catalogo-servicos.api';
 import { ESTOQUE_API, EstoqueApi } from '../../estoque/aplicacao/estoque.api';
 import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
-import { ItemPeca, ItemServico, SituacaoItemPeca } from '../dominio/itens';
+import {
+  PecaOrcada,
+  ServicoOrcado,
+  SituacaoPecaOrcada,
+} from '../dominio/itens';
 
 /**
- * Serviço de aplicação compartilhado pelo diagnóstico e pelos reparos
+ * Serviço de aplicação compartilhado pelo diagnóstico e pelos orçamentos
  * adicionais. Concentra a regra de CONGELAR preços (do catálogo e do estoque)
  * e a verificação SOMENTE LEITURA do estoque, com cotação dos faltantes.
  *
@@ -27,9 +31,8 @@ export class MontadorDeItens {
 
   async montarServicos(
     servicos: { servicoId: string; quantidade: number }[],
-    reparoId: string | null = null,
-  ): Promise<ItemServico[]> {
-    const itens: ItemServico[] = [];
+  ): Promise<ServicoOrcado[]> {
+    const itens: ServicoOrcado[] = [];
     for (const s of servicos) {
       const servico = await this.catalogo.buscarServico(s.servicoId);
       if (!servico) {
@@ -43,7 +46,6 @@ export class MontadorDeItens {
         descricao: servico.nome, // snapshot
         quantidade: s.quantidade,
         precoAplicado: servico.precoBase, // congelado
-        reparoId,
       });
     }
     return itens;
@@ -52,8 +54,7 @@ export class MontadorDeItens {
   async montarPecas(
     ordemId: string,
     pecas: { pecaId: string; quantidade: number }[],
-    reparoId: string | null = null,
-  ): Promise<ItemPeca[]> {
+  ): Promise<PecaOrcada[]> {
     if (pecas.length === 0) {
       return [];
     }
@@ -64,7 +65,7 @@ export class MontadorDeItens {
     );
     const porPeca = new Map(disponibilidades.map((d) => [d.pecaId, d]));
 
-    const itens: ItemPeca[] = [];
+    const itens: PecaOrcada[] = [];
     for (const p of pecas) {
       const d = porPeca.get(p.pecaId);
       if (!d || !d.encontrada) {
@@ -80,8 +81,7 @@ export class MontadorDeItens {
           descricao: d.nome,
           quantidade: p.quantidade,
           precoAplicado: d.precoUnitario, // congelado
-          situacao: SituacaoItemPeca.DISPONIVEL,
-          reparoId,
+          situacao: SituacaoPecaOrcada.DISPONIVEL,
         });
       } else {
         const cotacao = await this.estoque.solicitarCotacao(
@@ -95,8 +95,7 @@ export class MontadorDeItens {
           descricao: d.nome,
           quantidade: p.quantidade,
           precoAplicado: cotacao.preco, // congelado (preço cotado)
-          situacao: SituacaoItemPeca.EM_COTACAO,
-          reparoId,
+          situacao: SituacaoPecaOrcada.EM_COTACAO,
         });
       }
     }

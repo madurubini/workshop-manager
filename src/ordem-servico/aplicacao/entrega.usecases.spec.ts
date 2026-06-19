@@ -14,21 +14,20 @@ function osFinalizada(): OrdemServico {
     problemaRelatado: 'x',
   });
   os.registrarDiagnostico({
-    itensServico: [
+    servicos: [
       {
         id: 'is1',
         servicoId: 's1',
         descricao: 'S',
         quantidade: 1,
         precoAplicado: 100,
-        reparoId: null,
       },
     ],
-    itensPeca: [],
+    pecas: [],
     orcamentoId: 'orc-1',
   });
   os.enviarOrcamento();
-  os.aprovarOrcamento('cliente');
+  os.aprovarOrcamento('orc-1', 'cliente');
   os.concluirExecucao('mecanico');
   os.puxarEventos();
   return os;

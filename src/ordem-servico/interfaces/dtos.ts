@@ -11,7 +11,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { SituacaoItemPeca } from '../dominio/itens';
+import { Orcamento, SituacaoPecaOrcada } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { ROTULO_STATUS } from '../dominio/status-os';
 
@@ -38,34 +38,56 @@ class HistoricoItemDto {
   @ApiProperty({ nullable: true }) por!: string | null;
 }
 
-class ItemServicoDto {
+class ServicoOrcadoDto {
   @ApiProperty() servicoId!: string;
   @ApiProperty() descricao!: string;
   @ApiProperty() quantidade!: number;
   @ApiProperty() precoAplicado!: number;
 }
 
-class ItemPecaDto {
+class PecaOrcadaDto {
   @ApiProperty() pecaId!: string;
   @ApiProperty() descricao!: string;
   @ApiProperty() quantidade!: number;
   @ApiProperty() precoAplicado!: number;
-  @ApiProperty({ enum: SituacaoItemPeca }) situacao!: SituacaoItemPeca;
+  @ApiProperty({ enum: SituacaoPecaOrcada }) situacao!: SituacaoPecaOrcada;
 }
 
 class OrcamentoDto {
   @ApiProperty() id!: string;
+  @ApiProperty({ example: 'INICIAL' }) tipo!: string;
+  @ApiProperty({ nullable: true }) descricao!: string | null;
   @ApiProperty() totalServicos!: number;
   @ApiProperty() totalPecas!: number;
   @ApiProperty() total!: number;
   @ApiProperty() status!: string;
-}
+  @ApiProperty({ type: [ServicoOrcadoDto] }) servicos!: ServicoOrcadoDto[];
+  @ApiProperty({ type: [PecaOrcadaDto] }) pecas!: PecaOrcadaDto[];
 
-class ReparoDto {
-  @ApiProperty() id!: string;
-  @ApiProperty() descricao!: string;
-  @ApiProperty() total!: number;
-  @ApiProperty() status!: string;
+  static de(o: Orcamento): OrcamentoDto {
+    return {
+      id: o.id,
+      tipo: o.tipo,
+      descricao: o.descricao,
+      totalServicos: o.totalServicos,
+      totalPecas: o.totalPecas,
+      total: o.total,
+      status: o.status,
+      servicos: o.servicos.map((i) => ({
+        servicoId: i.servicoId,
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        precoAplicado: i.precoAplicado,
+      })),
+      pecas: o.pecas.map((i) => ({
+        pecaId: i.pecaId,
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        precoAplicado: i.precoAplicado,
+        situacao: i.situacao,
+      })),
+    };
+  }
 }
 
 export class OrdemServicoRespostaDto {
@@ -80,14 +102,9 @@ export class OrdemServicoRespostaDto {
   @ApiProperty({ nullable: true }) pagoEm!: Date | null;
   @ApiProperty() criadoEm!: Date;
   @ApiProperty({ type: [HistoricoItemDto] }) historico!: HistoricoItemDto[];
-  @ApiProperty({ type: [ItemServicoDto] }) itensServico!: ItemServicoDto[];
-  @ApiProperty({ type: [ItemPecaDto] }) itensPeca!: ItemPecaDto[];
-  @ApiProperty({ type: [ReparoDto] }) reparos!: ReparoDto[];
-  @ApiProperty({ type: OrcamentoDto, nullable: true })
-  orcamento!: OrcamentoDto | null;
+  @ApiProperty({ type: [OrcamentoDto] }) orcamentos!: OrcamentoDto[];
 
   static de(ordem: OrdemServico): OrdemServicoRespostaDto {
-    const o = ordem.orcamento;
     return {
       id: ordem.id,
       numero: ordem.numero,
@@ -104,34 +121,7 @@ export class OrdemServicoRespostaDto {
         em: h.em,
         por: h.por,
       })),
-      itensServico: ordem.itensServico.map((i) => ({
-        servicoId: i.servicoId,
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        precoAplicado: i.precoAplicado,
-      })),
-      itensPeca: ordem.itensPeca.map((i) => ({
-        pecaId: i.pecaId,
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        precoAplicado: i.precoAplicado,
-        situacao: i.situacao,
-      })),
-      reparos: ordem.reparos.map((r) => ({
-        id: r.id,
-        descricao: r.descricao,
-        total: r.total,
-        status: r.status,
-      })),
-      orcamento: o
-        ? {
-            id: o.id,
-            totalServicos: o.totalServicos,
-            totalPecas: o.totalPecas,
-            total: o.total,
-            status: o.status,
-          }
-        : null,
+      orcamentos: ordem.orcamentos.map(OrcamentoDto.de),
     };
   }
 }
@@ -175,35 +165,25 @@ export class RegistrarDiagnosticoDto {
 
 class PendenciaEstoqueDto {
   @ApiProperty() pecaId!: string;
-  @ApiProperty({ enum: SituacaoItemPeca }) situacao!: SituacaoItemPeca;
+  @ApiProperty({ enum: SituacaoPecaOrcada }) situacao!: SituacaoPecaOrcada;
 }
 
-/** Visão pública do cliente: status, orçamento e histórico (sem dados internos). */
+/** Visão pública do cliente: status, orçamentos e histórico (sem dados internos). */
 export class AcompanhamentoRespostaDto {
   @ApiProperty() numero!: string;
   @ApiProperty() problemaRelatado!: string;
   @ApiProperty() status!: string;
   @ApiProperty() pago!: boolean;
-  @ApiProperty({ type: OrcamentoDto, nullable: true })
-  orcamento!: OrcamentoDto | null;
+  @ApiProperty({ type: [OrcamentoDto] }) orcamentos!: OrcamentoDto[];
   @ApiProperty({ type: [HistoricoItemDto] }) historico!: HistoricoItemDto[];
 
   static de(ordem: OrdemServico): AcompanhamentoRespostaDto {
-    const o = ordem.orcamento;
     return {
       numero: ordem.numero,
       problemaRelatado: ordem.problemaRelatado,
       status: ROTULO_STATUS[ordem.status],
       pago: ordem.pago,
-      orcamento: o
-        ? {
-            id: o.id,
-            totalServicos: o.totalServicos,
-            totalPecas: o.totalPecas,
-            total: o.total,
-            status: o.status,
-          }
-        : null,
+      orcamentos: ordem.orcamentos.map(OrcamentoDto.de),
       historico: ordem.historico.map((h) => ({
         status: ROTULO_STATUS[h.status],
         em: h.em,
@@ -224,7 +204,7 @@ export class RespostaOrcamentoDto {
   justificativa?: string;
 }
 
-export class RegistrarReparoAdicionalDto {
+export class LancarOrcamentoAdicionalDto {
   @ApiProperty({ example: 'Troca da correia dentada (desgaste detectado)' })
   @IsString()
   @IsNotEmpty()
@@ -245,19 +225,13 @@ export class RegistrarReparoAdicionalDto {
   pecas?: ItemPecaEntradaDto[];
 }
 
-export class RespostaReparoDto {
-  @ApiProperty({ description: 'true autoriza, false recusa o reparo' })
-  @IsBoolean()
-  aprovado!: boolean;
-}
-
 export class PagamentoDto {
   @ApiProperty({ example: true, description: 'Confirma o pagamento manual' })
   @IsBoolean()
   pago!: boolean;
 }
 
-/** Resposta do diagnóstico no formato do contrato. */
+/** Resposta do diagnóstico no formato do contrato (usa o orçamento inicial). */
 export class DiagnosticoRespostaDto {
   @ApiProperty({ example: 'Em diagnóstico' }) status!: string;
   @ApiProperty({ type: OrcamentoDto }) orcamento!: OrcamentoDto;
@@ -268,15 +242,9 @@ export class DiagnosticoRespostaDto {
     const o = ordem.orcamento!;
     return {
       status: ROTULO_STATUS[ordem.status],
-      orcamento: {
-        id: o.id,
-        totalServicos: o.totalServicos,
-        totalPecas: o.totalPecas,
-        total: o.total,
-        status: o.status,
-      },
-      pendenciasEstoque: ordem.itensPeca
-        .filter((i) => i.situacao !== SituacaoItemPeca.DISPONIVEL)
+      orcamento: OrcamentoDto.de(o),
+      pendenciasEstoque: o.pecas
+        .filter((i) => i.situacao !== SituacaoPecaOrcada.DISPONIVEL)
         .map((i) => ({ pecaId: i.pecaId, situacao: i.situacao })),
     };
   }

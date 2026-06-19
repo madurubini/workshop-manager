@@ -1,6 +1,6 @@
 import { PublicadorDeEventos } from '../../compartilhado/dominio/publicador-de-eventos';
 import { ErroNaoEncontrado } from '../../compartilhado/erros/erros-dominio';
-import { SituacaoItemPeca } from '../dominio/itens';
+import { SituacaoPecaOrcada } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { StatusOS } from '../dominio/status-os';
 import { OrdemServicoRepository } from '../dominio/repositorios';
@@ -17,25 +17,23 @@ function osComOrcamentoEnviado(): OrdemServico {
     problemaRelatado: 'x',
   });
   os.registrarDiagnostico({
-    itensServico: [
+    servicos: [
       {
         id: 'is1',
         servicoId: 's1',
         descricao: 'S',
         quantidade: 1,
         precoAplicado: 100,
-        reparoId: null,
       },
     ],
-    itensPeca: [
+    pecas: [
       {
         id: 'ip1',
         pecaId: 'p1',
         descricao: 'Filtro',
         quantidade: 2,
         precoAplicado: 35,
-        situacao: SituacaoItemPeca.DISPONIVEL,
-        reparoId: null,
+        situacao: SituacaoPecaOrcada.DISPONIVEL,
       },
     ],
     orcamentoId: 'orc-1',
@@ -71,17 +69,16 @@ describe('Casos de uso de orçamento', () => {
         problemaRelatado: 'x',
       });
       os.registrarDiagnostico({
-        itensServico: [
+        servicos: [
           {
             id: 'is1',
             servicoId: 's1',
             descricao: 'S',
             quantidade: 1,
             precoAplicado: 100,
-            reparoId: null,
           },
         ],
-        itensPeca: [],
+        pecas: [],
         orcamentoId: 'orc-1',
       });
       os.puxarEventos();
@@ -107,7 +104,10 @@ describe('Casos de uso de orçamento', () => {
       const os = osComOrcamentoEnviado();
       ordens.buscarPorId.mockResolvedValue(os);
 
-      await new AprovarOrcamento(ordens, eventos).executar({ ordemId: 'os-1' });
+      await new AprovarOrcamento(ordens, eventos).executar({
+        ordemId: 'os-1',
+        orcamentoId: 'orc-1',
+      });
 
       expect(os.status).toBe(StatusOS.EM_EXECUCAO);
       expect(ordens.atualizar).toHaveBeenCalledWith(os);
@@ -129,6 +129,7 @@ describe('Casos de uso de orçamento', () => {
 
       await new RecusarOrcamento(ordens, eventos).executar({
         ordemId: 'os-1',
+        orcamentoId: 'orc-1',
         justificativa: 'caro',
       });
 

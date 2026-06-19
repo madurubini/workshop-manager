@@ -4,11 +4,11 @@ import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
 } from '../dominio/repositorios';
-import { StatusReparo } from '../dominio/itens';
+import { StatusOrcamento, TipoOrcamento } from '../dominio/itens';
 import {
+  OrcamentoAdicionalAguardando,
   OrdemAguardando,
   OrdemServicoConsultaApi,
-  ReparoAguardando,
 } from './ordem-servico-consulta.api';
 
 @Injectable()
@@ -25,16 +25,21 @@ export class OrdemServicoConsultaService implements OrdemServicoConsultaApi {
     return ordens.map((o) => ({ ordemId: o.id, numero: o.numero }));
   }
 
-  async listarReparosAguardando(): Promise<ReparoAguardando[]> {
+  async listarOrcamentosAdicionaisAguardando(): Promise<
+    OrcamentoAdicionalAguardando[]
+  > {
     const ordens = await this.ordens.listar({ status: StatusOS.EM_EXECUCAO });
-    const pendentes: ReparoAguardando[] = [];
+    const pendentes: OrcamentoAdicionalAguardando[] = [];
     for (const ordem of ordens) {
-      for (const reparo of ordem.reparos) {
-        if (reparo.status === StatusReparo.AGUARDANDO) {
+      for (const orcamento of ordem.orcamentos) {
+        if (
+          orcamento.tipo === TipoOrcamento.ADICIONAL &&
+          orcamento.status === StatusOrcamento.ENVIADO
+        ) {
           pendentes.push({
             ordemId: ordem.id,
             numero: ordem.numero,
-            reparoId: reparo.id,
+            orcamentoId: orcamento.id,
           });
         }
       }

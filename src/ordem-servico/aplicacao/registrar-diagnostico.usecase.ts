@@ -43,15 +43,15 @@ export class RegistrarDiagnostico {
       });
     }
 
-    const itensServico = await this.montador.montarServicos(entrada.servicos);
-    const itensPeca = await this.montador.montarPecas(
+    const servicos = await this.montador.montarServicos(entrada.servicos);
+    const pecas = await this.montador.montarPecas(
       entrada.ordemId,
       entrada.pecas,
     );
 
     ordem.registrarDiagnostico({
-      itensServico,
-      itensPeca,
+      servicos,
+      pecas,
       orcamentoId: randomUUID(),
       por: entrada.por,
     });

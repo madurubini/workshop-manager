@@ -14,21 +14,17 @@ import {
   OrcamentoRecusado,
   OSAberta,
   PagamentoConfirmado,
-  ReparoAdicionalLancado,
-  ReparoAprovado,
-  ReparoRecusado,
   StatusOSAlterado,
   VeiculoEntregue,
 } from './eventos';
 import {
-  arredondar2,
-  ItemPeca,
-  ItemServico,
+  calcularTotais,
   Orcamento,
-  ReparoAdicional,
-  SituacaoItemPeca,
+  PecaOrcada,
+  ServicoOrcado,
+  SituacaoPecaOrcada,
   StatusOrcamento,
-  StatusReparo,
+  TipoOrcamento,
 } from './itens';
 import { StatusOS, transicaoPermitida } from './status-os';
 
@@ -51,18 +47,19 @@ interface PropsOrdemServico {
   iniciadoExecucaoEm: Date | null;
   finalizadoEm: Date | null;
   historico: RegistroHistorico[];
-  itensServico: ItemServico[];
-  itensPeca: ItemPeca[];
-  reparos: ReparoAdicional[];
-  orcamento: Orcamento | null;
+  orcamentos: Orcamento[];
 }
 
 /**
  * Raiz de agregado Ordem de Serviço — núcleo do sistema. Carrega o ciclo de
  * vida inteiro (do recebimento à entrega) e é a guardiã da máquina de estados:
  * toda mudança de status passa por `transicionarPara`, que rejeita transições
- * inválidas e grava o histórico. Orçamento, itens e reparos entram nas
- * próximas fases.
+ * inválidas e grava o histórico.
+ *
+ * Uma OS tem vários orçamentos: um INICIAL (do diagnóstico) e zero ou mais
+ * ADICIONAL (reparos descobertos na execução). Aprovar/recusar o INICIAL move o
+ * status da OS; os ADICIONAL apenas liberam (ou não) o trabalho extra, sem
+ * mudar o status. A OS só finaliza quando NENHUM orçamento está pendente.
  */
 export class OrdemServico extends AgregadoRaiz<string> {
   private constructor(
@@ -100,10 +97,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
       historico: [
         { status: StatusOS.RECEBIDA, em: agora, por: entrada.por ?? null },
       ],
-      itensServico: [],
-      itensPeca: [],
-      reparos: [],
-      orcamento: null,
+      orcamentos: [],
     });
     os.registrarEvento(new OSAberta(os.id, os.numero));
     return os;
@@ -135,123 +129,213 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
 
   /**
-   * Registra o diagnóstico: grava os itens (com preços já congelados pela
-   * aplicação), gera o orçamento (totais calculados aqui — regra de domínio) e
-   * leva a OS de Recebida para Em diagnóstico. Se a OS não estiver em Recebida,
-   * a própria máquina de estados rejeita (HTTP 422).
+   * Registra o diagnóstico: cria o orçamento INICIAL (com as linhas já
+   * precificadas pela aplicação — preços congelados) e leva a OS de Recebida
+   * para Em diagnóstico. Se a OS não estiver em Recebida, a própria máquina de
+   * estados rejeita (HTTP 422).
    */
   registrarDiagnostico(entrada: {
-    itensServico: ItemServico[];
-    itensPeca: ItemPeca[];
+    servicos: ServicoOrcado[];
+    pecas: PecaOrcada[];
     orcamentoId: string;
     por?: string | null;
   }): void {
-    if (entrada.itensServico.length === 0 && entrada.itensPeca.length === 0) {
+    if (entrada.servicos.length === 0 && entrada.pecas.length === 0) {
       throw new ErroValidacao(
         'O diagnóstico precisa de ao menos um serviço ou peça.',
       );
     }
+    if (this.orcamentoInicial()) {
+      throw new ErroValidacao('Esta OS já tem orçamento inicial.');
+    }
 
     this.transicionarPara(StatusOS.EM_DIAGNOSTICO, entrada.por);
 
-    this.props.itensServico = entrada.itensServico;
-    this.props.itensPeca = entrada.itensPeca;
-
-    const totalServicos = arredondar2(
-      entrada.itensServico.reduce(
-        (soma, i) => soma + i.precoAplicado * i.quantidade,
-        0,
-      ),
-    );
-    const totalPecas = arredondar2(
-      entrada.itensPeca.reduce(
-        (soma, i) => soma + i.precoAplicado * i.quantidade,
-        0,
-      ),
-    );
-
-    this.props.orcamento = {
+    const orcamento: Orcamento = {
       id: entrada.orcamentoId,
-      totalServicos,
-      totalPecas,
-      total: arredondar2(totalServicos + totalPecas),
+      tipo: TipoOrcamento.INICIAL,
+      descricao: null,
+      totalServicos: 0,
+      totalPecas: 0,
+      total: 0,
       status: StatusOrcamento.GERADO,
+      criadoEm: new Date(),
       enviadoEm: null,
       respondidoEm: null,
+      servicos: entrada.servicos,
+      pecas: entrada.pecas,
     };
+    calcularTotais(orcamento);
+    this.props.orcamentos.push(orcamento);
 
     this.registrarEvento(new DiagnosticoConcluido(this.id));
     this.registrarEvento(
       new OrcamentoGerado(
         this.id,
-        this.props.orcamento.id,
-        this.props.orcamento.total,
+        orcamento.id,
+        orcamento.tipo,
+        orcamento.total,
       ),
     );
   }
 
-  /** Envia o orçamento ao cliente: GERADO → ENVIADO; OS → Aguardando aprovação. */
+  /** Envia o orçamento INICIAL ao cliente: GERADO → ENVIADO; OS → Aguardando aprovação. */
   enviarOrcamento(por?: string | null): void {
-    const orcamento = this.orcamentoNoEstado(StatusOrcamento.GERADO);
+    const orcamento = this.orcamentoInicial();
+    if (!orcamento) {
+      throw new ErroValidacao('Esta OS ainda não tem orçamento inicial.');
+    }
+    if (orcamento.status !== StatusOrcamento.GERADO) {
+      throw new ErroTransicaoInvalida(
+        `Orçamento precisa estar GERADO; está ${orcamento.status}.`,
+      );
+    }
     orcamento.status = StatusOrcamento.ENVIADO;
     orcamento.enviadoEm = new Date();
     this.transicionarPara(StatusOS.AGUARDANDO_APROVACAO, por);
-    this.registrarEvento(new OrcamentoEnviado(this.id, this.props.numero));
+    this.registrarEvento(
+      new OrcamentoEnviado(
+        this.id,
+        this.props.numero,
+        orcamento.id,
+        orcamento.tipo,
+      ),
+    );
   }
 
   /**
-   * Cliente aprova o orçamento: ENVIADO → APROVADO; OS → Em execução. Marca os
-   * itens (DISPONIVEL → RESERVADA, EM_COTACAO → ENCOMENDADA) e emite o evento
-   * com a situação ORIGINAL, para o Estoque reservar/encomendar.
+   * Cliente APROVA um orçamento (inicial ou adicional). Marca as peças daquele
+   * orçamento (DISPONIVEL → RESERVADA, EM_COTACAO → ENCOMENDADA) e emite o
+   * evento com a situação ORIGINAL, para o Estoque reservar/encomendar.
+   * Se for o INICIAL, leva a OS para Em execução; se for ADICIONAL, a OS
+   * continua em execução (só libera o trabalho extra).
    */
-  aprovarOrcamento(por?: string | null): void {
-    const orcamento = this.orcamentoNoEstado(StatusOrcamento.ENVIADO);
-
-    // Captura a situação original antes de alterar (o Estoque precisa dela).
-    const itensParaEstoque: ItemPecaAprovado[] = this.props.itensPeca.map(
-      (i) => ({
-        pecaId: i.pecaId,
-        quantidade: i.quantidade,
-        situacao:
-          i.situacao === SituacaoItemPeca.DISPONIVEL
-            ? 'DISPONIVEL'
-            : 'EM_COTACAO',
-      }),
+  aprovarOrcamento(orcamentoId: string, por?: string | null): void {
+    const orcamento = this.orcamentoNoEstado(
+      orcamentoId,
+      StatusOrcamento.ENVIADO,
     );
+
+    const itensParaEstoque = this.capturarPecasParaEstoque(orcamento);
 
     orcamento.status = StatusOrcamento.APROVADO;
     orcamento.respondidoEm = new Date();
+    this.reservarPecasDoOrcamento(orcamento);
 
-    for (const item of this.props.itensPeca) {
-      item.situacao =
-        item.situacao === SituacaoItemPeca.DISPONIVEL
-          ? SituacaoItemPeca.RESERVADA
-          : SituacaoItemPeca.ENCOMENDADA;
+    if (orcamento.tipo === TipoOrcamento.INICIAL) {
+      this.props.iniciadoExecucaoEm = new Date();
+      this.transicionarPara(StatusOS.EM_EXECUCAO, por);
     }
 
-    this.props.iniciadoExecucaoEm = new Date();
-    this.transicionarPara(StatusOS.EM_EXECUCAO, por);
-    this.registrarEvento(new OrcamentoAprovado(this.id, itensParaEstoque));
-  }
-
-  /** Cliente recusa o orçamento: ENVIADO → RECUSADO; OS → Cancelada. */
-  recusarOrcamento(justificativa?: string | null, por?: string | null): void {
-    const orcamento = this.orcamentoNoEstado(StatusOrcamento.ENVIADO);
-    orcamento.status = StatusOrcamento.RECUSADO;
-    orcamento.respondidoEm = new Date();
-    this.transicionarPara(StatusOS.CANCELADA, por);
-    this.registrarEvento(new OrcamentoRecusado(this.id, justificativa ?? null));
+    this.registrarEvento(
+      new OrcamentoAprovado(
+        this.id,
+        orcamento.id,
+        orcamento.tipo,
+        itensParaEstoque,
+      ),
+    );
   }
 
   /**
-   * Mecânico conclui a execução. Bloqueia se houver reparo aguardando resposta
-   * (regra: só finaliza sem reparo pendente). Registra o tempo e leva a OS para
-   * Finalizada; o evento dispara a baixa do estoque das peças reservadas.
+   * Cliente RECUSA um orçamento. INICIAL → OS Cancelada; ADICIONAL → apenas
+   * marca recusado (o trabalho extra não é feito) e a OS segue em execução.
+   */
+  recusarOrcamento(
+    orcamentoId: string,
+    justificativa?: string | null,
+    por?: string | null,
+  ): void {
+    const orcamento = this.orcamentoNoEstado(
+      orcamentoId,
+      StatusOrcamento.ENVIADO,
+    );
+    orcamento.status = StatusOrcamento.RECUSADO;
+    orcamento.respondidoEm = new Date();
+
+    if (orcamento.tipo === TipoOrcamento.INICIAL) {
+      this.transicionarPara(StatusOS.CANCELADA, por);
+    }
+
+    this.registrarEvento(
+      new OrcamentoRecusado(
+        this.id,
+        orcamento.id,
+        orcamento.tipo,
+        justificativa ?? null,
+      ),
+    );
+  }
+
+  /**
+   * Lança um orçamento ADICIONAL durante a execução (o antigo "reparo
+   * adicional"). Nasce já ENVIADO, aguardando o cliente. A OS continua Em
+   * execução. As linhas já vêm com preço congelado pela aplicação.
+   */
+  adicionarOrcamentoAdicional(entrada: {
+    id: string;
+    descricao: string;
+    servicos: ServicoOrcado[];
+    pecas: PecaOrcada[];
+    por?: string | null;
+  }): void {
+    if (this.props.status !== StatusOS.EM_EXECUCAO) {
+      throw new ErroTransicaoInvalida(
+        'Orçamento adicional só pode ser lançado com a OS em execução.',
+      );
+    }
+    if (entrada.servicos.length === 0 && entrada.pecas.length === 0) {
+      throw new ErroValidacao(
+        'Orçamento adicional precisa de ao menos um serviço ou peça.',
+      );
+    }
+
+    const agora = new Date();
+    const orcamento: Orcamento = {
+      id: entrada.id,
+      tipo: TipoOrcamento.ADICIONAL,
+      descricao: entrada.descricao,
+      totalServicos: 0,
+      totalPecas: 0,
+      total: 0,
+      status: StatusOrcamento.ENVIADO,
+      criadoEm: agora,
+      enviadoEm: agora,
+      respondidoEm: null,
+      servicos: entrada.servicos,
+      pecas: entrada.pecas,
+    };
+    calcularTotais(orcamento);
+    this.props.orcamentos.push(orcamento);
+
+    this.registrarEvento(
+      new OrcamentoGerado(
+        this.id,
+        orcamento.id,
+        orcamento.tipo,
+        orcamento.total,
+      ),
+    );
+    this.registrarEvento(
+      new OrcamentoEnviado(
+        this.id,
+        this.props.numero,
+        orcamento.id,
+        orcamento.tipo,
+      ),
+    );
+  }
+
+  /**
+   * Mecânico conclui a execução. Bloqueia se houver orçamento aguardando
+   * resposta (regra: só finaliza sem orçamento pendente). Registra o tempo e
+   * leva a OS para Finalizada; o evento dispara a baixa do estoque das peças
+   * reservadas.
    */
   concluirExecucao(por?: string | null): void {
-    if (this.temReparoPendente()) {
+    if (this.temOrcamentoPendente()) {
       throw new ErroValidacao(
-        'Há reparo adicional aguardando resposta do cliente; não é possível concluir.',
+        'Há orçamento aguardando resposta do cliente; não é possível concluir.',
       );
     }
     this.props.finalizadoEm = new Date();
@@ -259,97 +343,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(
       new ExecucaoConcluida(this.id, this.tempoExecucaoMinutos()),
     );
-  }
-
-  /**
-   * Lança um reparo adicional durante a execução (itens com preço já congelado
-   * pela aplicação). Atualiza o orçamento e emite o evento que pede autorização
-   * ao cliente. A OS continua Em execução; o reparo nasce AGUARDANDO.
-   */
-  adicionarReparo(entrada: {
-    id: string;
-    descricao: string;
-    itensServico: ItemServico[];
-    itensPeca: ItemPeca[];
-  }): void {
-    if (this.props.status !== StatusOS.EM_EXECUCAO) {
-      throw new ErroTransicaoInvalida(
-        'Reparo adicional só pode ser lançado com a OS em execução.',
-      );
-    }
-    if (entrada.itensServico.length === 0 && entrada.itensPeca.length === 0) {
-      throw new ErroValidacao('Reparo precisa de ao menos um serviço ou peça.');
-    }
-
-    const itensServico = entrada.itensServico.map((i) => ({
-      ...i,
-      reparoId: entrada.id,
-    }));
-    const itensPeca = entrada.itensPeca.map((i) => ({
-      ...i,
-      reparoId: entrada.id,
-    }));
-    const total = arredondar2(
-      [...itensServico, ...itensPeca].reduce(
-        (soma, i) => soma + i.precoAplicado * i.quantidade,
-        0,
-      ),
-    );
-
-    this.props.reparos.push({
-      id: entrada.id,
-      descricao: entrada.descricao,
-      total,
-      status: StatusReparo.AGUARDANDO,
-      criadoEm: new Date(),
-      respondidoEm: null,
-    });
-    this.props.itensServico.push(...itensServico);
-    this.props.itensPeca.push(...itensPeca);
-    this.recalcularOrcamento();
-
-    this.registrarEvento(new ReparoAdicionalLancado(this.id, entrada.id));
-  }
-
-  /** Cliente aprova o reparo: peças do reparo viram reservada/encomendada. */
-  aprovarReparo(reparoId: string): void {
-    const reparo = this.reparoNoEstado(reparoId, StatusReparo.AGUARDANDO);
-    const itensDoReparo = this.props.itensPeca.filter(
-      (i) => i.reparoId === reparoId,
-    );
-    const payload: ItemPecaAprovado[] = itensDoReparo.map((i) => ({
-      pecaId: i.pecaId,
-      quantidade: i.quantidade,
-      situacao:
-        i.situacao === SituacaoItemPeca.DISPONIVEL
-          ? 'DISPONIVEL'
-          : 'EM_COTACAO',
-    }));
-
-    reparo.status = StatusReparo.APROVADO;
-    reparo.respondidoEm = new Date();
-    for (const item of itensDoReparo) {
-      item.situacao =
-        item.situacao === SituacaoItemPeca.DISPONIVEL
-          ? SituacaoItemPeca.RESERVADA
-          : SituacaoItemPeca.ENCOMENDADA;
-    }
-    this.registrarEvento(new ReparoAprovado(this.id, reparoId, payload));
-  }
-
-  /** Cliente recusa o reparo: remove seus itens e segue só com o aprovado. */
-  recusarReparo(reparoId: string): void {
-    const reparo = this.reparoNoEstado(reparoId, StatusReparo.AGUARDANDO);
-    reparo.status = StatusReparo.RECUSADO;
-    reparo.respondidoEm = new Date();
-    this.props.itensServico = this.props.itensServico.filter(
-      (i) => i.reparoId !== reparoId,
-    );
-    this.props.itensPeca = this.props.itensPeca.filter(
-      (i) => i.reparoId !== reparoId,
-    );
-    this.recalcularOrcamento();
-    this.registrarEvento(new ReparoRecusado(this.id, reparoId));
   }
 
   /**
@@ -384,61 +377,58 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(new VeiculoEntregue(this.id, this.props.numero));
   }
 
-  /** Garante que existe orçamento e que ele está no estado esperado. */
-  private orcamentoNoEstado(esperado: StatusOrcamento): Orcamento {
-    if (!this.props.orcamento) {
-      throw new ErroValidacao('Esta OS ainda não tem orçamento.');
+  // ───────────────────────────── internos ─────────────────────────────
+
+  private orcamentoInicial(): Orcamento | undefined {
+    return this.props.orcamentos.find((o) => o.tipo === TipoOrcamento.INICIAL);
+  }
+
+  /** Acha um orçamento por id e garante que está no estado esperado. */
+  private orcamentoNoEstado(
+    orcamentoId: string,
+    esperado: StatusOrcamento,
+  ): Orcamento {
+    const orcamento = this.props.orcamentos.find((o) => o.id === orcamentoId);
+    if (!orcamento) {
+      throw new ErroNaoEncontrado('Orçamento não encontrado.', { orcamentoId });
     }
-    if (this.props.orcamento.status !== esperado) {
+    if (orcamento.status !== esperado) {
       throw new ErroTransicaoInvalida(
-        `Orçamento precisa estar ${esperado}; está ${this.props.orcamento.status}.`,
+        `Orçamento precisa estar ${esperado}; está ${orcamento.status}.`,
       );
     }
-    return this.props.orcamento;
+    return orcamento;
   }
 
-  private reparoNoEstado(
-    reparoId: string,
-    esperado: StatusReparo,
-  ): ReparoAdicional {
-    const reparo = this.props.reparos.find((r) => r.id === reparoId);
-    if (!reparo) {
-      throw new ErroNaoEncontrado('Reparo adicional não encontrado.', {
-        reparoId,
-      });
-    }
-    if (reparo.status !== esperado) {
-      throw new ErroTransicaoInvalida(
-        `Reparo precisa estar ${esperado}; está ${reparo.status}.`,
-      );
-    }
-    return reparo;
+  /** Snapshot das peças do orçamento (situação original) para o Estoque. */
+  private capturarPecasParaEstoque(orcamento: Orcamento): ItemPecaAprovado[] {
+    return orcamento.pecas.map((i) => ({
+      pecaId: i.pecaId,
+      quantidade: i.quantidade,
+      situacao:
+        i.situacao === SituacaoPecaOrcada.DISPONIVEL
+          ? 'DISPONIVEL'
+          : 'EM_COTACAO',
+    }));
   }
 
-  private temReparoPendente(): boolean {
-    return this.props.reparos.some((r) => r.status === StatusReparo.AGUARDANDO);
+  /** Atualiza a situação das peças do orçamento aprovado. */
+  private reservarPecasDoOrcamento(orcamento: Orcamento): void {
+    for (const item of orcamento.pecas) {
+      item.situacao =
+        item.situacao === SituacaoPecaOrcada.DISPONIVEL
+          ? SituacaoPecaOrcada.RESERVADA
+          : SituacaoPecaOrcada.ENCOMENDADA;
+    }
   }
 
-  /** Recalcula os totais do orçamento a partir de todos os itens atuais. */
-  private recalcularOrcamento(): void {
-    if (!this.props.orcamento) {
-      return;
-    }
-    const totalServicos = arredondar2(
-      this.props.itensServico.reduce(
-        (soma, i) => soma + i.precoAplicado * i.quantidade,
-        0,
-      ),
+  /** Há orçamento ainda não decidido pelo cliente (GERADO ou ENVIADO)? */
+  private temOrcamentoPendente(): boolean {
+    return this.props.orcamentos.some(
+      (o) =>
+        o.status === StatusOrcamento.GERADO ||
+        o.status === StatusOrcamento.ENVIADO,
     );
-    const totalPecas = arredondar2(
-      this.props.itensPeca.reduce(
-        (soma, i) => soma + i.precoAplicado * i.quantidade,
-        0,
-      ),
-    );
-    this.props.orcamento.totalServicos = totalServicos;
-    this.props.orcamento.totalPecas = totalPecas;
-    this.props.orcamento.total = arredondar2(totalServicos + totalPecas);
   }
 
   private tempoExecucaoMinutos(): number | null {
@@ -450,6 +440,8 @@ export class OrdemServico extends AgregadoRaiz<string> {
       this.props.iniciadoExecucaoEm.getTime();
     return Math.round(ms / 60000);
   }
+
+  // ───────────────────────────── getters ─────────────────────────────
 
   get numero(): string {
     return this.props.numero;
@@ -478,17 +470,12 @@ export class OrdemServico extends AgregadoRaiz<string> {
   get historico(): readonly RegistroHistorico[] {
     return this.props.historico;
   }
-  get itensServico(): readonly ItemServico[] {
-    return this.props.itensServico;
+  get orcamentos(): readonly Orcamento[] {
+    return this.props.orcamentos;
   }
-  get itensPeca(): readonly ItemPeca[] {
-    return this.props.itensPeca;
-  }
-  get reparos(): readonly ReparoAdicional[] {
-    return this.props.reparos;
-  }
+  /** Orçamento inicial (do diagnóstico), se já existir. */
   get orcamento(): Orcamento | null {
-    return this.props.orcamento;
+    return this.orcamentoInicial() ?? null;
   }
   get iniciadoExecucaoEm(): Date | null {
     return this.props.iniciadoExecucaoEm;

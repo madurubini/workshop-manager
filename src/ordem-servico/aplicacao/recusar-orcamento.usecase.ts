@@ -26,6 +26,7 @@ export class RecusarOrcamento {
 
   async executar(entrada: {
     ordemId: string;
+    orcamentoId: string;
     justificativa?: string | null;
     por?: string | null;
   }): Promise<OrdemServico> {
@@ -35,7 +36,11 @@ export class RecusarOrcamento {
         ordemId: entrada.ordemId,
       });
     }
-    ordem.recusarOrcamento(entrada.justificativa, entrada.por);
+    ordem.recusarOrcamento(
+      entrada.orcamentoId,
+      entrada.justificativa,
+      entrada.por,
+    );
     await this.ordens.atualizar(ordem);
     await this.eventos.publicar(...ordem.puxarEventos());
     return ordem;

@@ -51,8 +51,10 @@ acontece de duas formas:
   pertence a um cliente; soft delete (`ativo`).
 - **Ordem de Serviço** (núcleo) — máquina de estados
   `Recebida → Em diagnóstico → Aguardando aprovação → Em execução → Finalizada → Entregue`
-  (ou `Cancelada`); transições inválidas → **HTTP 422**. Orçamento e diagnóstico são entidades
-  **internas** da OS. O orçamento **congela o preço** dos itens. Optimistic lock (`versao`).
+  (ou `Cancelada`); transições inválidas → **HTTP 422**. Uma OS tem **vários orçamentos**: um
+  `INICIAL` (do diagnóstico) e zero ou mais `ADICIONAL` (reparos descobertos na execução). Cada
+  orçamento é aprovado/recusado por id; a OS só finaliza quando nenhum está pendente. As linhas
+  orçadas (`ServicoOrcado`/`PecaOrcada`) **congelam o preço**. Optimistic lock (`versao`).
 - **Estoque** (raiz Peça) — `disponivel = saldoFisico − reservado`; nunca reserva acima do
   disponível. Verificar no diagnóstico é **só leitura**; reserva só após o orçamento aprovado;
   baixa só na conclusão da execução.
@@ -103,11 +105,14 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
 
 Use o token nas rotas administrativas: `Authorization: Bearer <accessToken>`.
 
+Novos usuários são criados por um GESTOR via `POST /usuarios` (`{ username, senha, papel }`,
+papel ∈ `RECEPCIONISTA | MECANICO | GESTOR`). A senha nunca volta na resposta — só o hash é gravado.
+
 ## API (resumo)
 
 Base `/api/v1`. Detalhes e schemas no Swagger.
 
-**Auth:** `POST /auth/login`
+**Auth:** `POST /auth/login` · **Usuários (JWT, GESTOR):** `POST /usuarios`
 
 **CRUD administrativo (JWT):**
 - `/clientes` (POST, GET, GET/{id}, PUT/{id}, DELETE/{id})
@@ -120,14 +125,13 @@ Base `/api/v1`. Detalhes e schemas no Swagger.
   faltantes e gera o orçamento (status → Em diagnóstico)
 - `POST .../orcamento/enviar` — → Aguardando aprovação; notifica o cliente
 - `POST .../execucao/concluir` — baixa peças reservadas, registra tempo; → Finalizada
-- `POST .../reparos-adicionais` — lança reparo; atualiza orçamento; notifica
+- `POST .../orcamentos-adicionais` — lança orçamento adicional; envia ao cliente; notifica
 - `POST .../pagamento` (`{ pago: true }`) · `POST .../entrega` (exige pago)
 - `GET /relatorios/tempo-medio-execucao` (`?inicio=&fim=`)
 
 **Acompanhamento do cliente (público, token da OS):**
 - `GET /acompanhamento/{osId}`
-- `POST .../orcamento/resposta` (`{ aprovado, justificativa? }`) — roteia para aprovar/recusar
-- `POST .../reparos-adicionais/{reparoId}/resposta` (`{ aprovado }`)
+- `POST .../orcamentos/{orcamentoId}/resposta` (`{ aprovado, justificativa? }`) — inicial ou adicional; roteia para aprovar/recusar
 
 > **Comando automático não é rota:** reservar, encomendar, baixar, gerar orçamento, mudar
 > status e reenviar notificação são efeitos disparados por política/evento dentro das ações

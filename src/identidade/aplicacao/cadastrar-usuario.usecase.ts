@@ -1,0 +1,81 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import {
+  ErroConflito,
+  ErroValidacao,
+} from '../../compartilhado/erros/erros-dominio';
+import { Papel, Usuario } from '../dominio/usuario';
+import {
+  HASH_DE_SENHA,
+  HashDeSenha,
+  USUARIO_REPOSITORY,
+  UsuarioRepository,
+} from '../dominio/portas';
+
+const PAPEIS_VALIDOS: Papel[] = ['RECEPCIONISTA', 'MECANICO', 'GESTOR'];
+
+export interface EntradaCadastrarUsuario {
+  username: string;
+  senha: string;
+  papel: Papel;
+}
+
+export interface UsuarioCriado {
+  id: string;
+  username: string;
+  papel: Papel;
+  ativo: boolean;
+}
+
+/**
+ * Caso de uso: cadastrar um usuário administrativo. Restrito ao GESTOR (o papel
+ * é checado no guard da rota). Valida os dados, garante username único e grava
+ * apenas o HASH da senha — nunca o texto plano.
+ */
+@Injectable()
+export class CadastrarUsuario {
+  constructor(
+    @Inject(USUARIO_REPOSITORY)
+    private readonly usuarios: UsuarioRepository,
+    @Inject(HASH_DE_SENHA)
+    private readonly hash: HashDeSenha,
+  ) {}
+
+  async executar(entrada: EntradaCadastrarUsuario): Promise<UsuarioCriado> {
+    const username = entrada.username?.trim();
+    if (!username) {
+      throw new ErroValidacao('username é obrigatório.');
+    }
+    if (!entrada.senha || entrada.senha.length < 6) {
+      throw new ErroValidacao('A senha deve ter ao menos 6 caracteres.');
+    }
+    if (!PAPEIS_VALIDOS.includes(entrada.papel)) {
+      throw new ErroValidacao('Papel inválido.', {
+        papeisValidos: PAPEIS_VALIDOS,
+      });
+    }
+
+    const existente = await this.usuarios.buscarPorUsername(username);
+    if (existente) {
+      throw new ErroConflito('Já existe um usuário com esse username.', {
+        username,
+      });
+    }
+
+    const usuario: Usuario = {
+      id: randomUUID(),
+      username,
+      senhaHash: await this.hash.gerar(entrada.senha),
+      papel: entrada.papel,
+      ativo: true,
+    };
+    await this.usuarios.inserir(usuario);
+
+    return {
+      id: usuario.id,
+      username: usuario.username,
+      papel: usuario.papel,
+      ativo: usuario.ativo,
+    };
+  }
+}

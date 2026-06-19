@@ -14,6 +14,9 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 ## Autenticação
 - `POST /auth/login` → `{ accessToken, expiresIn }`
 
+## Usuários (admin) — cadastro
+- `POST /usuarios` — cadastra um operador (`{ username, senha, papel }`). **Restrito ao GESTOR** (papel checado no token). Responde `{ id, username, papel, ativo }` (nunca a senha).
+
 ## Clientes (admin) — CRUD
 - `POST /clientes` · `GET /clientes` · `GET /clientes/{id}` · `PUT /clientes/{id}` · `DELETE /clientes/{id}`
 - Valida CPF/CNPJ; documento único.
@@ -40,8 +43,8 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 | `GET /ordens-servico/{id}` | Detalhe completo da OS. | — |
 | `POST /ordens-servico/{id}/diagnostico` | Registra serviços + peças e conclui o diagnóstico num payload só. | Verifica estoque, cota faltantes, gera o orçamento; status passa por Em diagnóstico. |
 | `POST /ordens-servico/{id}/orcamento/enviar` | Envia o orçamento ao cliente. | Status → Aguardando aprovação; notifica o cliente. |
-| `POST /ordens-servico/{id}/execucao/concluir` | Mecânico conclui a execução. | Baixa peças reservadas, registra tempo; status → Finalizada (se sem reparo pendente). |
-| `POST /ordens-servico/{id}/reparos-adicionais` | Lança um reparo adicional (`servicos`, `pecas`). | Atualiza o orçamento e notifica o cliente para autorizar. |
+| `POST /ordens-servico/{id}/execucao/concluir` | Mecânico conclui a execução. | Baixa peças reservadas, registra tempo; status → Finalizada (se nenhum orçamento estiver pendente). |
+| `POST /ordens-servico/{id}/orcamentos-adicionais` | Lança um **orçamento adicional** durante a execução (`descricao`, `servicos`, `pecas`). | Cria um novo orçamento (tipo ADICIONAL) já enviado e notifica o cliente para autorizar. |
 | `POST /ordens-servico/{id}/pagamento` | Marca a OS como paga (pagamento manual). Corpo `{ pago: true }`. | Libera a entrega. |
 | `POST /ordens-servico/{id}/entrega` | Entrega o veículo e encerra a OS. | Status → Entregue → encerrada. Exige pagamento confirmado. |
 | `GET /relatorios/tempo-medio-execucao` | Tempo médio de execução (`?periodo=`). | — |
@@ -65,16 +68,16 @@ Exemplo do diagnóstico (a rota que mais concentra):
 
 | Método / Rota | O que faz |
 |---|---|
-| `GET /acompanhamento/{osId}` | Consulta pública: status, orçamento e histórico. |
-| `POST /acompanhamento/{osId}/orcamento/resposta` | Corpo `{ aprovado: bool, justificativa? }`. Aprovado → Em execução + reserva/encomenda; recusado → Cancelada. O controller roteia para dois casos de uso distintos (Aprovar / Recusar). |
-| `POST /acompanhamento/{osId}/reparos-adicionais/{reparoId}/resposta` | Corpo `{ aprovado: bool }`. Aprovado → volta para reserva/execução; recusado → segue só com o aprovado. |
+| `GET /acompanhamento/{osId}` | Consulta pública: status, orçamentos (inicial + adicionais) e histórico. |
+| `POST /acompanhamento/{osId}/orcamentos/{orcamentoId}/resposta` | Corpo `{ aprovado: bool, justificativa? }`. Vale para o orçamento **inicial** e os **adicionais** (identificados pelo `orcamentoId`). Inicial aprovado → Em execução + reserva/encomenda; inicial recusado → Cancelada. Adicional aprovado → reserva/encomenda o trabalho extra; adicional recusado → segue só com o aprovado. O controller roteia para dois casos de uso (Aprovar / Recusar). |
 
 ---
 
 ## Resumo da contagem
 - 4 CRUDs administrativos (clientes, veículos, serviços, peças) — exigidos pelo enunciado.
+- 1 cadastro de usuário (`POST /usuarios`, GESTOR).
 - 9 rotas na OS (3 de leitura/criação + 6 de ação).
-- 3 rotas de acompanhamento do cliente.
+- 2 rotas de acompanhamento do cliente (consulta + resposta a orçamento por id).
 - 1 auth + 1 relatório.
 
 Os comandos automáticos (reservar, encomendar, baixar, gerar orçamento, mudar status, reenviar notificação) **não** aparecem como rota: vivem dentro das ações acima, disparados por política.

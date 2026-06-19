@@ -27,6 +27,7 @@ export class AprovarOrcamento {
 
   async executar(entrada: {
     ordemId: string;
+    orcamentoId: string;
     por?: string | null;
   }): Promise<OrdemServico> {
     const ordem = await this.ordens.buscarPorId(entrada.ordemId);
@@ -35,7 +36,7 @@ export class AprovarOrcamento {
         ordemId: entrada.ordemId,
       });
     }
-    ordem.aprovarOrcamento(entrada.por);
+    ordem.aprovarOrcamento(entrada.orcamentoId, entrada.por);
     await this.ordens.atualizar(ordem);
     await this.eventos.publicar(...ordem.puxarEventos());
     return ordem;

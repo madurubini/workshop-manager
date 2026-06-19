@@ -47,10 +47,10 @@ A OS carrega o ciclo de vida inteiro: abertura → diagnóstico → orçamento �
 | Ordem de Serviço (OS) | EN (raiz) | Registro completo do atendimento de um veículo, do recebimento à entrega. |
 | Status da OS | VO | Estado atual da OS. Valores: Recebida, Em diagnóstico, Aguardando aprovação, Em execução, Finalizada, Entregue, Cancelada. |
 | Diagnóstico | EN | Avaliação técnica feita pelo mecânico; reúne os serviços e peças necessários. |
-| Item de Serviço | EN | Serviço incluído na OS (referencia o Catálogo de Serviços) com preço aplicado. |
-| Item de Peça | EN | Peça incluída na OS (referencia o Estoque) com quantidade e preço aplicado. |
-| Orçamento | EN (interna) | Valor consolidado de serviços + peças enviado ao cliente para aprovação. Aprová-lo/recusá-lo muda o status da OS. |
-| Reparo adicional | EN | Serviço/peça identificado durante a execução que exige nova autorização do cliente. |
+| Serviço Orçado | EN (interna) | Linha de serviço de um orçamento (referencia o Catálogo de Serviços) com preço **congelado**. |
+| Peça Orçada | EN (interna) | Linha de peça de um orçamento (referencia o Estoque) com quantidade, situação e preço **congelado**. |
+| Orçamento | EN (interna) | Conjunto consolidado de serviços + peças enviado ao cliente para aprovação. Uma OS tem vários: um **INICIAL** (diagnóstico) e zero ou mais **ADICIONAL**. Aprovar/recusar o INICIAL muda o status da OS. |
+| Orçamento adicional | EN (interna) | Orçamento (tipo ADICIONAL) com serviço/peça identificado durante a execução, que exige nova autorização do cliente. Antes chamado de "reparo adicional". |
 | Tempo de execução | VO | Duração registrada da execução, base para o tempo médio. |
 | Problema relatado | VO | Descrição do problema informado na abertura. |
 
@@ -63,8 +63,8 @@ A OS carrega o ciclo de vida inteiro: abertura → diagnóstico → orçamento �
 - Ao concluir o diagnóstico → gerar orçamento.
 - Status muda sozinho conforme a ação: Em diagnóstico, Aguardando aprovação, Em execução, Finalizada, Entregue, Cancelada.
 - Ao aprovar o orçamento → reservar disponíveis e encomendar faltantes (chama o Estoque).
-- Cliente sem resposta (orçamento ou reparo adicional) → o Sistema reenvia a notificação periodicamente (**não** expira).
-- Conclusão do reparo só com status Finalizada se não houver reparos adicionais pendentes.
+- Cliente sem resposta (orçamento inicial ou adicional) → o Sistema reenvia a notificação periodicamente (**não** expira).
+- Conclusão da execução só vai para Finalizada se não houver orçamento (inicial ou adicional) pendente. Orçamento adicional recusado → o veículo é entregue sem aquele trabalho.
 - Pagamento recusado → reter o veículo até o pagamento.
 
 **Invariantes (máquina de estados):** as transições só seguem a ordem válida; a execução só inicia com todas as peças reservadas; o diagnóstico só conclui depois que o estoque responde (disponibilidade/cotação).

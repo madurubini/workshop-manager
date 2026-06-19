@@ -23,4 +23,16 @@ export class PrismaUsuarioRepository implements UsuarioRepository {
       ativo: registro.ativo,
     };
   }
+
+  async inserir(usuario: Usuario): Promise<void> {
+    await this.prisma.usuario.create({
+      data: {
+        id: usuario.id,
+        username: usuario.username,
+        senhaHash: usuario.senhaHash,
+        papel: usuario.papel,
+        ativo: usuario.ativo,
+      },
+    });
+  }
 }

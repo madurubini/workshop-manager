@@ -10,15 +10,17 @@ export interface OrdemAguardando {
   numero: string;
 }
 
-export interface ReparoAguardando {
+export interface OrcamentoAdicionalAguardando {
   ordemId: string;
   numero: string;
-  reparoId: string;
+  orcamentoId: string;
 }
 
 export interface OrdemServicoConsultaApi {
   /** OS no estado "Aguardando aprovação" (cliente ainda não respondeu). */
   listarAguardandoResposta(): Promise<OrdemAguardando[]>;
-  /** Reparos adicionais aguardando autorização do cliente. */
-  listarReparosAguardando(): Promise<ReparoAguardando[]>;
+  /** Orçamentos adicionais aguardando autorização do cliente. */
+  listarOrcamentosAdicionaisAguardando(): Promise<
+    OrcamentoAdicionalAguardando[]
+  >;
 }

@@ -5,7 +5,13 @@ import { HashDeSenha } from '../dominio/portas';
 /** Adaptador bcrypt da porta HashDeSenha. */
 @Injectable()
 export class BcryptHashDeSenha implements HashDeSenha {
+  private readonly custo = 10;
+
   comparar(senhaPlana: string, hash: string): Promise<boolean> {
     return bcrypt.compare(senhaPlana, hash);
+  }
+
+  gerar(senhaPlana: string): Promise<string> {
+    return bcrypt.hash(senhaPlana, this.custo);
   }
 }
