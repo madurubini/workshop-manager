@@ -28,3 +28,7 @@ yarn-error.log*
 
 # prisma
 prisma/*.db
+
+# Claude Code (estado local, não versionar)
+.claude/worktrees/
+.claude/settings.local.json
