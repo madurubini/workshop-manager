@@ -1,12 +1,27 @@
+# Dependências e artefatos de build (recriados no estágio builder)
 node_modules
 dist
+build
 coverage
+
+# Git e IDE
 .git
+.gitignore
 .idea
 .vscode
-*.log
-.env
-.env.local
-docs
-test
 .claude
+
+# Ambiente / segredos (a imagem recebe via variáveis do container)
+.env*
+
+# Testes, documentação e configs de dev — fora da imagem de produção
+test
+docs
+*.md
+.eslintrc.js
+.prettierrc
+docker-compose.yml
+*.log
+
+# Mantidos de propósito (a imagem precisa): prisma/, docker-entrypoint.sh,
+# package.json, package-lock.json
