@@ -16,7 +16,11 @@ describe('NotificarCliente (assinante de eventos)', () => {
 
   beforeEach(() => {
     notificador = { notificar: jest.fn() };
-    handler = new NotificarCliente(notificador);
+    const tokens = {
+      gerar: jest.fn().mockResolvedValue('token-fake'),
+      verificar: jest.fn(),
+    };
+    handler = new NotificarCliente(notificador, tokens);
   });
 
   it('notifica ao enviar o orçamento', async () => {

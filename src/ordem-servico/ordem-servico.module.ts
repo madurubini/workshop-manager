@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CatalogoServicosModule } from '../catalogo-servicos/catalogo-servicos.module';
 import { ClientesVeiculosModule } from '../clientes-veiculos/clientes-veiculos.module';
 import { EstoqueModule } from '../estoque/estoque.module';
+import { IdentidadeModule } from '../identidade/identidade.module';
 import { AbrirOrdemServico } from './aplicacao/abrir-ordem-servico.usecase';
 import { AprovarOrcamento } from './aplicacao/aprovar-orcamento.usecase';
 import { ConcluirExecucao } from './aplicacao/concluir-execucao.usecase';
@@ -31,7 +32,12 @@ import { RelatoriosController } from './interfaces/relatorios.controller';
  * Estoque, não por chamada direta.
  */
 @Module({
-  imports: [ClientesVeiculosModule, CatalogoServicosModule, EstoqueModule],
+  imports: [
+    ClientesVeiculosModule,
+    CatalogoServicosModule,
+    EstoqueModule,
+    IdentidadeModule,
+  ],
   controllers: [
     OrdensServicoController,
     AcompanhamentoController,

@@ -3,18 +3,17 @@ import { OnEvent } from '@nestjs/event-emitter';
 // Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
 import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
 import { FORNECEDOR, Fornecedor } from '../dominio/fornecedor';
-import {
-  PECA_REPOSITORY,
-  PecaRepository,
-  RESERVA_REPOSITORY,
-  ReservaRepository,
-} from '../dominio/repositorios';
+import { PECA_REPOSITORY, PecaRepository } from '../dominio/repositorios';
 
 /**
  * Política do Estoque: ao aprovar o orçamento, reserva as peças disponíveis e
  * encomenda as faltantes. É um EFEITO POSTERIOR disparado por evento — por isso
  * não é uma rota nem uma chamada direta do Ordem de Serviço. O Estoque apenas
  * "escuta" o evento `ordem-servico.orcamento-aprovado`.
+ *
+ * A reserva é ATÔMICA (UPDATE condicional no banco): mesmo que duas OS aprovem
+ * a mesma peça ao mesmo tempo, só reserva quem ainda tem disponível; a outra
+ * cai para encomenda. Sem corrida, sem dupla reserva.
  */
 @Injectable()
 export class ReservarNaAprovacao {
@@ -23,8 +22,6 @@ export class ReservarNaAprovacao {
   constructor(
     @Inject(PECA_REPOSITORY)
     private readonly pecas: PecaRepository,
-    @Inject(RESERVA_REPOSITORY)
-    private readonly reservas: ReservaRepository,
     @Inject(FORNECEDOR)
     private readonly fornecedor: Fornecedor,
   ) {}
@@ -41,32 +38,29 @@ export class ReservarNaAprovacao {
     itensPeca: OrcamentoAprovado['itensPeca'],
   ): Promise<void> {
     for (const item of itensPeca) {
-      const peca = await this.pecas.buscarPorId(item.pecaId);
-      if (!peca) {
-        this.logger.warn(`Peça ${item.pecaId} não encontrada ao reservar.`);
-        continue;
+      // Peça que estava disponível no diagnóstico: tenta reservar atomicamente.
+      if (item.situacao === 'DISPONIVEL') {
+        const reservou = await this.pecas.reservarAtomico({
+          pecaId: item.pecaId,
+          ordemId,
+          quantidade: item.quantidade,
+        });
+        if (reservou) {
+          continue;
+        }
+        // O disponível acabou entre o diagnóstico e a aprovação (outra OS levou):
+        // cai para encomenda, como se estivesse em falta.
+        this.logger.warn(
+          `Peça ${item.pecaId} sem disponível na aprovação (corrida); encomendando.`,
+        );
       }
 
-      // Reserva o que estiver disponível de fato; o resto vira encomenda.
-      if (
-        item.situacao === 'DISPONIVEL' &&
-        peca.temDisponivel(item.quantidade)
-      ) {
-        peca.reservar(item.quantidade);
-        await this.pecas.salvar(peca);
-        await this.reservas.registrar({
-          pecaId: item.pecaId,
-          ordemId,
-          quantidade: item.quantidade,
-          status: 'RESERVADA',
-        });
-      } else {
-        await this.fornecedor.encomendar({
-          ordemId,
-          pecaId: item.pecaId,
-          quantidade: item.quantidade,
-        });
-      }
+      // Peça em falta (EM_COTACAO) ou que perdeu a corrida: encomenda.
+      await this.fornecedor.encomendar({
+        ordemId,
+        pecaId: item.pecaId,
+        quantidade: item.quantidade,
+      });
     }
   }
 }

@@ -14,6 +14,7 @@ describe('BaixarNaConclusao (política do estoque)', () => {
       salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorCodigo: jest.fn(),
+      reservarAtomico: jest.fn(),
       listar: jest.fn(),
     };
     reservas = {

@@ -31,7 +31,7 @@ export class CadastrarCliente {
 
   async executar(entrada: EntradaCadastrarCliente): Promise<Cliente> {
     // A raiz valida o documento (formato + dígitos) ao construir.
-    const cliente = Cliente.cadastrar({
+    const novo = Cliente.cadastrar({
       id: randomUUID(),
       documento: entrada.documento,
       nome: entrada.nome,
@@ -39,17 +39,30 @@ export class CadastrarCliente {
       telefone: entrada.telefone,
     });
 
-    const jaExiste = await this.clientes.buscarPorDocumento(
-      cliente.documento.valor,
+    const existente = await this.clientes.buscarPorDocumento(
+      novo.documento.valor,
     );
-    if (jaExiste) {
-      throw new ErroConflito('Já existe um cliente com este documento.', {
-        documento: cliente.documento.formatado,
+    if (existente) {
+      // CPF/CNPJ de cliente ATIVO → duplicata real (409).
+      if (existente.ativo) {
+        throw new ErroConflito('Já existe um cliente com este documento.', {
+          documento: novo.documento.formatado,
+        });
+      }
+      // CPF/CNPJ de cliente INATIVO → recadastro: reativa a linha existente
+      // (o documento é único; não criamos uma nova).
+      existente.reativar({
+        nome: entrada.nome,
+        email: entrada.email,
+        telefone: entrada.telefone,
       });
+      await this.clientes.salvar(existente);
+      await this.eventos.publicar(...existente.puxarEventos());
+      return existente;
     }
 
-    await this.clientes.inserir(cliente);
-    await this.eventos.publicar(...cliente.puxarEventos());
-    return cliente;
+    await this.clientes.inserir(novo);
+    await this.eventos.publicar(...novo.puxarEventos());
+    return novo;
   }
 }

@@ -17,6 +17,12 @@ Há ainda uma [nota de segurança do `npm audit`](docs/seguranca-npm-audit.md).
 - **@nestjs/event-emitter** — event bus in-process · **@nestjs/schedule** — reenvio periódico
 - **Docker** (`Dockerfile` multi-stage + `docker-compose.yml`)
 
+## Por que Postgres? (justificativa do banco)
+
+Banco **relacional** porque o domínio é cheio de **integridade referencial** (OS → cliente/veículo, orçamento → linhas, reserva → peça) e de **invariantes que exigem transação** — em especial a **reserva de estoque**, que precisa checar o disponível e gravar a reserva de forma **atômica** (um `UPDATE` condicional dentro de uma transação) para não permitir dupla reserva sob concorrência. Um banco de documentos tornaria essas garantias responsabilidade da aplicação.
+
+Dentro dos relacionais, **PostgreSQL** por: suporte ACID maduro, tipo `Decimal` nativo (preços sem erro de ponto flutuante), bom desempenho com índices nas FKs e no `status` da OS, e ótima integração com o **Prisma**. É open-source e roda igual em dev (Docker) e produção.
+
 ## Arquitetura — monolito modular
 
 Um deploy, um banco, organizado em módulos por **contexto delimitado**. Cada módulo de
@@ -67,11 +73,13 @@ acontece de duas formas:
 docker compose up --build
 ```
 
-No start, o container sincroniza o schema (`prisma db push`), roda o seed e sobe a API.
+No start, o container aplica as **migrations versionadas** (`prisma migrate deploy`), roda o seed e sobe a API.
 
 - API: http://localhost:3000/api/v1
 - Swagger: http://localhost:3000/api/docs
 - Postgres exposto no host em **5433** (para não colidir com um Postgres já na 5432).
+
+> Migrando de uma versão que usava `prisma db push`? Rode `docker compose down -v` uma vez para recriar o volume do banco limpo (o `migrate deploy` espera aplicar do zero).
 
 ### Opção 2 — Local (Node 18+)
 
@@ -79,10 +87,12 @@ No start, o container sincroniza o schema (`prisma db push`), roda o seed e sobe
 cp .env.example .env          # ajuste DATABASE_URL e JWT_SECRET se quiser
 npm install
 npm run prisma:generate
-npx prisma db push            # ou: npm run prisma:migrate
+npm run prisma:deploy         # aplica as migrations (prisma migrate deploy)
 npm run seed
 npm run start:dev
 ```
+
+> O schema é versionado em `prisma/migrations/`. Para criar uma **nova** migration ao mudar o `schema.prisma`: `npm run prisma:migrate` (gera o arquivo SQL e aplica em dev).
 
 > Requer um Postgres acessível na `DATABASE_URL`. Para subir só o banco:
 > `docker compose up db` (fica em `localhost:5433`).

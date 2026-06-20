@@ -1,0 +1,240 @@
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { execSync } from 'child_process';
+import * as bcrypt from 'bcrypt';
+import request from 'supertest';
+import { AppModule } from '../src/app.module';
+import { FiltroExcecaoGlobal } from '../src/compartilhado/erros/filtro-excecao-global';
+import { PrismaService } from '../src/compartilhado/infraestrutura/prisma/prisma.service';
+import {
+  ACOMPANHAMENTO_TOKEN,
+  AcompanhamentoToken,
+} from '../src/identidade/dominio/portas';
+
+/**
+ * E2E de INTEGRAÇÃO do fluxo da OS — sobe o AppModule inteiro contra um Postgres
+ * REAL e exercita o ciclo por HTTP (sem mocks): abrir → diagnóstico → orçamento
+ * → aprovação (token de acompanhamento) → reserva → conclusão → baixa →
+ * pagamento → entrega.
+ *
+ * Usa um banco DEDICADO (DATABASE_URL_E2E, ou um `oficina_e2e` local) e o reseta
+ * a cada execução — nunca toca no banco principal.
+ *
+ * Pré-requisito: um Postgres acessível. Com o compose: `docker compose up -d db`
+ * e um banco vazio `oficina_e2e` (ex.: `createdb` ou `CREATE DATABASE`).
+ */
+const E2E_DB =
+  process.env.DATABASE_URL_E2E ??
+  'postgresql://oficina:oficina@localhost:5433/oficina_e2e?schema=public';
+
+// Força TUDO (Prisma e o db push) a usar o banco de teste — protege o principal.
+process.env.DATABASE_URL = E2E_DB;
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'segredo-e2e';
+process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '3600s';
+
+const SERVICO_ID = '11111111-1111-4111-8111-111111111111';
+const PECA_ID = '33333333-3333-4333-8333-333333333333';
+
+describe('Fluxo da OS (e2e — integração com Postgres)', () => {
+  let app: INestApplication;
+  let prisma: PrismaService;
+
+  beforeAll(async () => {
+    // Schema limpo no banco de teste (reset a cada execução).
+    execSync('npx prisma db push --force-reset --skip-generate', {
+      stdio: 'inherit',
+      env: process.env,
+    });
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    app.useGlobalFilters(new FiltroExcecaoGlobal());
+    await app.init();
+
+    prisma = app.get(PrismaService);
+    await prisma.usuario.create({
+      data: {
+        username: 'gestor',
+        senhaHash: await bcrypt.hash('gestor123', 10),
+        papel: 'GESTOR',
+      },
+    });
+    await prisma.servico.create({
+      data: { id: SERVICO_ID, nome: 'Troca de óleo', precoBase: 120 },
+    });
+    await prisma.peca.create({
+      data: {
+        id: PECA_ID,
+        codigo: 'FILTRO-OLEO',
+        nome: 'Filtro de óleo',
+        precoUnitario: 35,
+        saldoFisico: 10,
+      },
+    });
+  }, 60000);
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('percorre o ciclo completo da OS e movimenta o estoque', async () => {
+    const http = request(app.getHttpServer());
+    const base = '/api/v1';
+
+    // 1. Login (operador)
+    const login = await http
+      .post(`${base}/auth/login`)
+      .send({ username: 'gestor', senha: 'gestor123' })
+      .expect(200);
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+
+    // 2. Cliente + veículo
+    const cli = await http
+      .post(`${base}/clientes`)
+      .set(auth)
+      .send({ documento: '529.982.247-25', nome: 'Maria' })
+      .expect(201);
+    const veic = await http
+      .post(`${base}/clientes/${cli.body.id}/veiculos`)
+      .set(auth)
+      .send({ placa: 'ABC1D23', marca: 'VW', modelo: 'Gol', ano: 2018 })
+      .expect(201);
+
+    // 3. Abrir OS
+    const os = await http
+      .post(`${base}/ordens-servico`)
+      .set(auth)
+      .send({
+        clienteId: cli.body.id,
+        veiculoId: veic.body.id,
+        problemaRelatado: 'Barulho na suspensão',
+      })
+      .expect(201);
+    const osId = os.body.id;
+    expect(os.body.status).toBe('Recebida');
+
+    // 4. Diagnóstico → orçamento inicial (preço congelado)
+    const diag = await http
+      .post(`${base}/ordens-servico/${osId}/diagnostico`)
+      .set(auth)
+      .send({
+        servicos: [{ servicoId: SERVICO_ID, quantidade: 1 }],
+        pecas: [{ pecaId: PECA_ID, quantidade: 2 }],
+      })
+      .expect(200);
+    const orcamentoId = diag.body.orcamento.id;
+    expect(diag.body.orcamento.total).toBe(190); // 120 + 2*35
+
+    // 5. Enviar orçamento
+    await http
+      .post(`${base}/ordens-servico/${osId}/orcamento/enviar`)
+      .set(auth)
+      .expect(200);
+
+    // 6. Cliente aprova via TOKEN DE ACOMPANHAMENTO (sem login de operador)
+    const acomp = app.get<AcompanhamentoToken>(ACOMPANHAMENTO_TOKEN);
+    const tokenCliente = await acomp.gerar(osId);
+    const aprov = await http
+      .post(`${base}/acompanhamento/${osId}/orcamentos/${orcamentoId}/resposta`)
+      .set({ Authorization: `Bearer ${tokenCliente}` })
+      .send({ aprovado: true })
+      .expect(200);
+    expect(aprov.body.status).toBe('Em execução');
+
+    // 7. Reserva refletida no estoque (reservado subiu)
+    const pecaResv = await http
+      .get(`${base}/pecas/${PECA_ID}`)
+      .set(auth)
+      .expect(200);
+    expect(pecaResv.body.reservado).toBe(2);
+
+    // 8. Concluir execução → baixa
+    const concl = await http
+      .post(`${base}/ordens-servico/${osId}/execucao/concluir`)
+      .set(auth)
+      .expect(200);
+    expect(concl.body.status).toBe('Finalizada');
+
+    const pecaBaixa = await http
+      .get(`${base}/pecas/${PECA_ID}`)
+      .set(auth)
+      .expect(200);
+    expect(pecaBaixa.body.saldoFisico).toBe(8); // 10 - 2
+    expect(pecaBaixa.body.reservado).toBe(0);
+
+    // 9. Pagamento + entrega
+    await http
+      .post(`${base}/ordens-servico/${osId}/pagamento`)
+      .set(auth)
+      .send({ pago: true })
+      .expect(200);
+    const entrega = await http
+      .post(`${base}/ordens-servico/${osId}/entrega`)
+      .set(auth)
+      .expect(200);
+    expect(entrega.body.status).toBe('Entregue');
+  }, 30000);
+
+  it('rejeita aprovar com token de acompanhamento de OUTRA OS (anti-IDOR)', async () => {
+    const http = request(app.getHttpServer());
+    const base = '/api/v1';
+    const login = await http
+      .post(`${base}/auth/login`)
+      .send({ username: 'gestor', senha: 'gestor123' })
+      .expect(200);
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+
+    const cli = await http
+      .post(`${base}/clientes`)
+      .set(auth)
+      .send({ documento: '11144477735', nome: 'João' })
+      .expect(201);
+    const veic = await http
+      .post(`${base}/clientes/${cli.body.id}/veiculos`)
+      .set(auth)
+      .send({ placa: 'XYZ4B56', marca: 'Fiat', modelo: 'Uno', ano: 2015 })
+      .expect(201);
+    const os = await http
+      .post(`${base}/ordens-servico`)
+      .set(auth)
+      .send({
+        clienteId: cli.body.id,
+        veiculoId: veic.body.id,
+        problemaRelatado: 'Revisão',
+      })
+      .expect(201);
+    const diag = await http
+      .post(`${base}/ordens-servico/${os.body.id}/diagnostico`)
+      .set(auth)
+      .send({ servicos: [{ servicoId: SERVICO_ID, quantidade: 1 }] })
+      .expect(200);
+    await http
+      .post(`${base}/ordens-servico/${os.body.id}/orcamento/enviar`)
+      .set(auth)
+      .expect(200);
+
+    // Token de OUTRA OS (id aleatório) → 403
+    const acomp = app.get<AcompanhamentoToken>(ACOMPANHAMENTO_TOKEN);
+    const tokenDeOutraOS = await acomp.gerar(
+      '00000000-0000-4000-8000-000000000000',
+    );
+    await http
+      .post(
+        `${base}/acompanhamento/${os.body.id}/orcamentos/${diag.body.orcamento.id}/resposta`,
+      )
+      .set({ Authorization: `Bearer ${tokenDeOutraOS}` })
+      .send({ aprovado: true })
+      .expect(403);
+  }, 30000);
+});

@@ -26,6 +26,7 @@ describe('EstoqueApiService', () => {
       salvar: jest.fn(),
       buscarPorId: jest.fn(),
       buscarPorCodigo: jest.fn(),
+      reservarAtomico: jest.fn(),
       listar: jest.fn(),
     };
     cotacoes = { registrar: jest.fn() };

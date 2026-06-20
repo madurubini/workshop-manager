@@ -45,12 +45,41 @@ describe('CadastrarCliente', () => {
     expect(repo.buscarPorDocumento).not.toHaveBeenCalled();
   });
 
-  it('rejeita documento duplicado com conflito', async () => {
-    repo.buscarPorDocumento.mockResolvedValue({} as Cliente);
+  it('rejeita documento de cliente ATIVO com conflito', async () => {
+    const ativo = Cliente.cadastrar({
+      id: 'c-existente',
+      documento: '52998224725',
+      nome: 'Antiga',
+    });
+    repo.buscarPorDocumento.mockResolvedValue(ativo);
 
     await expect(
       usecase.executar({ documento: '52998224725', nome: 'Maria' }),
     ).rejects.toBeInstanceOf(ErroConflito);
     expect(repo.inserir).not.toHaveBeenCalled();
+  });
+
+  it('recadastra: reativa o cliente INATIVO em vez de criar outro', async () => {
+    const inativo = Cliente.cadastrar({
+      id: 'c-2',
+      documento: '52998224725',
+      nome: 'Antiga',
+    });
+    inativo.inativar();
+    inativo.puxarEventos(); // limpa o evento do cadastro original
+    repo.buscarPorDocumento.mockResolvedValue(inativo);
+
+    const resultado = await usecase.executar({
+      documento: '52998224725',
+      nome: 'Nova',
+      email: 'nova@email.com',
+    });
+
+    expect(resultado).toBe(inativo);
+    expect(inativo.ativo).toBe(true);
+    expect(inativo.nome).toBe('Nova');
+    expect(repo.salvar).toHaveBeenCalledWith(inativo);
+    expect(repo.inserir).not.toHaveBeenCalled();
+    expect(eventos.publicar).toHaveBeenCalled();
   });
 });

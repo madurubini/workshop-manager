@@ -17,6 +17,7 @@ function repo(): jest.Mocked<PecaRepository> {
     salvar: jest.fn(),
     buscarPorId: jest.fn(),
     buscarPorCodigo: jest.fn(),
+    reservarAtomico: jest.fn(),
     listar: jest.fn(),
   };
 }

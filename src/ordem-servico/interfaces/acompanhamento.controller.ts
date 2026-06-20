@@ -8,8 +8,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AcompanhamentoGuard } from '../../identidade/interfaces/acompanhamento.guard';
 import { AprovarOrcamento } from '../aplicacao/aprovar-orcamento.usecase';
 import { RecusarOrcamento } from '../aplicacao/recusar-orcamento.usecase';
 import {
@@ -19,12 +21,11 @@ import {
 import { AcompanhamentoRespostaDto, RespostaOrcamentoDto } from './dtos';
 
 /**
- * Acompanhamento do cliente (app). Rotas PÚBLICAS — sem JWT: o acesso é pelo id
- * da OS (o link enviado ao cliente funciona como token da OS, no MVP).
- *
- * O cliente responde a CADA orçamento pelo id (o inicial e os adicionais usam o
- * mesmo endpoint). O controller roteia para DOIS casos de uso distintos
- * (Aprovar / Recusar) conforme `{ aprovado }`, como pede o contrato.
+ * Acompanhamento do cliente (app). A CONSULTA (GET) é pública — o acesso é pelo
+ * id da OS (o link enviado ao cliente). Já a RESPOSTA ao orçamento (aprovar /
+ * recusar) exige o TOKEN DE ACOMPANHAMENTO daquela OS (assinado, com escopo e
+ * validade — gerado no envio do orçamento e embutido no link). O cliente aprova
+ * pelo app sem ter conta, e o token de uma OS não serve para outra.
  */
 @ApiTags('Acompanhamento do cliente')
 @Controller('acompanhamento')
@@ -49,10 +50,12 @@ export class AcompanhamentoController {
   }
 
   @Post(':osId/orcamentos/:orcamentoId/resposta')
+  @UseGuards(AcompanhamentoGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Cliente aprova ou recusa um orçamento (inicial ou adicional; roteia para dois casos de uso)',
+      'Cliente aprova ou recusa um orçamento via token de acompanhamento da OS (roteia para dois casos de uso)',
   })
   async responder(
     @Param('osId') osId: string,

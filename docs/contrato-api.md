@@ -5,7 +5,7 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 ## Convenções
 
 - Base URL: `/api/v1` · JSON · IDs em UUID · datas ISO-8601.
-- JWT `Bearer` nas rotas **administrativas**. As rotas de **acompanhamento** do cliente usam token da OS (link enviado) ou login do cliente.
+- JWT `Bearer` nas rotas **administrativas**. No **acompanhamento**: a consulta (`GET`) é pública pelo id da OS; **aprovar/recusar** exige o **token de acompanhamento** — um JWT assinado, com escopo da OS e validade, gerado no envio do orçamento e embutido no link (`Authorization: Bearer` ou `?token=`). O cliente aprova sem ter conta.
 - Erro padrão: `{ "erro": { "codigo", "mensagem", "detalhes" } }`.
 - Status: 200/201/204, 400 (validação), 401/403 (auth), 404, 409 (conflito), 422 (transição de status inválida).
 
@@ -68,8 +68,8 @@ Exemplo do diagnóstico (a rota que mais concentra):
 
 | Método / Rota | O que faz |
 |---|---|
-| `GET /acompanhamento/{osId}` | Consulta pública: status, orçamentos (inicial + adicionais) e histórico. |
-| `POST /acompanhamento/{osId}/orcamentos/{orcamentoId}/resposta` | Corpo `{ aprovado: bool, justificativa? }`. Vale para o orçamento **inicial** e os **adicionais** (identificados pelo `orcamentoId`). Inicial aprovado → Em execução + reserva/encomenda; inicial recusado → Cancelada. Adicional aprovado → reserva/encomenda o trabalho extra; adicional recusado → segue só com o aprovado. O controller roteia para dois casos de uso (Aprovar / Recusar). |
+| `GET /acompanhamento/{osId}` | Consulta **pública** (pelo id da OS): status, orçamentos (inicial + adicionais) e histórico. |
+| `POST /acompanhamento/{osId}/orcamentos/{orcamentoId}/resposta` | **Exige o token de acompanhamento da OS** (Bearer). Corpo `{ aprovado: bool, justificativa? }`. Vale para o orçamento **inicial** e os **adicionais** (identificados pelo `orcamentoId`). Inicial aprovado → Em execução + reserva/encomenda; inicial recusado → Cancelada. Adicional aprovado → reserva/encomenda o trabalho extra; adicional recusado → segue só com o aprovado. O controller roteia para dois casos de uso (Aprovar / Recusar). |
 
 ---
 

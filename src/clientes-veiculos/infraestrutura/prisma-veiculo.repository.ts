@@ -50,7 +50,7 @@ export class PrismaVeiculoRepository implements VeiculoRepository {
 
   async listarPorCliente(clienteId: string): Promise<Veiculo[]> {
     const registros = await this.prisma.veiculo.findMany({
-      where: { clienteId },
+      where: { clienteId, ativo: true }, // soft delete: não retorna inativos
       orderBy: { criadoEm: 'desc' },
     });
     return registros.map((r) => this.mapear(r));

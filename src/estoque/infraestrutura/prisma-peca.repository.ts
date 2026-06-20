@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Peca as PecaPrisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
 import { Peca } from '../dominio/peca';
 import { PecaRepository } from '../dominio/repositorios';
@@ -51,6 +52,40 @@ export class PrismaPecaRepository implements PecaRepository {
       orderBy: { nome: 'asc' },
     });
     return registros.map((r) => this.mapear(r));
+  }
+
+  async reservarAtomico(entrada: {
+    pecaId: string;
+    ordemId: string;
+    quantidade: number;
+  }): Promise<boolean> {
+    const { pecaId, ordemId, quantidade } = entrada;
+    return this.prisma.$transaction(async (tx) => {
+      // UPDATE condicional: só incrementa `reservado` se ainda houver
+      // disponível. O Postgres faz a checagem e a escrita atomicamente, então
+      // duas reservas concorrentes não conseguem ambas passar (sem corrida).
+      const afetadas = await tx.$executeRaw`
+        UPDATE "peca"
+        SET "reservado" = "reservado" + ${quantidade}
+        WHERE "id" = ${pecaId}::uuid
+          AND "ativo" = true
+          AND "saldoFisico" - "reservado" >= ${quantidade}`;
+
+      if (afetadas === 0) {
+        return false; // sem disponível (ou peça inexistente/inativa)
+      }
+
+      await tx.reservaEstoque.create({
+        data: {
+          id: randomUUID(),
+          pecaId,
+          ordemId,
+          quantidade,
+          status: 'RESERVADA',
+        },
+      });
+      return true;
+    });
   }
 
   private mapear(r: PecaPrisma): Peca {

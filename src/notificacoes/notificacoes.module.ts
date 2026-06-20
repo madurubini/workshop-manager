@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { IdentidadeModule } from '../identidade/identidade.module';
 import { OrdemServicoModule } from '../ordem-servico/ordem-servico.module';
 import { NotificarCliente } from './aplicacao/notificar-cliente.handler';
 import { ReenviarPendentes } from './aplicacao/reenviar-pendentes.policy';
@@ -12,7 +13,7 @@ import { NotificadorSimulado } from './infraestrutura/notificador-simulado';
  * de consulta — não conhece suas entidades.
  */
 @Module({
-  imports: [OrdemServicoModule],
+  imports: [OrdemServicoModule, IdentidadeModule],
   providers: [
     { provide: NOTIFICADOR, useClass: NotificadorSimulado },
     NotificarCliente,

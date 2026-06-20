@@ -98,6 +98,23 @@ export class Cliente extends AgregadoRaiz<string> {
     this.props.ativo = false;
   }
 
+  /**
+   * Reativa um cliente que estava inativo (recadastro). O documento é a
+   * identidade e tem índice único — então recadastrar o mesmo CPF/CNPJ não cria
+   * uma linha nova: reativa a existente com os dados informados.
+   */
+  reativar(entrada: {
+    nome?: string;
+    email?: string | null;
+    telefone?: string | null;
+  }): void {
+    this.props.ativo = true;
+    this.atualizarDados(entrada);
+    this.registrarEvento(
+      new ClienteCadastrado(this.id, this.props.documento.valor),
+    );
+  }
+
   get documento(): Documento {
     return this.props.documento;
   }

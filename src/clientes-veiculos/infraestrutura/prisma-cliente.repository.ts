@@ -50,6 +50,7 @@ export class PrismaClienteRepository implements ClienteRepository {
 
   async listar(): Promise<Cliente[]> {
     const registros = await this.prisma.cliente.findMany({
+      where: { ativo: true }, // soft delete: não retorna inativos
       orderBy: { criadoEm: 'desc' },
     });
     return registros.map((r) => this.mapear(r));
