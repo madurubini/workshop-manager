@@ -13,9 +13,17 @@ export interface PeriodoRelatorio {
   fim?: Date;
 }
 
+/** Serviço (do catálogo) efetivamente executado numa OS. */
+export interface ServicoExecutado {
+  id: string;
+  nome: string;
+}
+
 export interface TempoExecucao {
   iniciadoExecucaoEm: Date;
   finalizadoEm: Date;
+  /** Serviços distintos dos orçamentos APROVADOS — base do tempo por tipo. */
+  servicos: ServicoExecutado[];
 }
 
 export interface OrdemServicoRepository {

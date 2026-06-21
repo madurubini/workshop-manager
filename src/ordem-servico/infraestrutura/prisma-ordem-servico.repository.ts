@@ -204,14 +204,34 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         finalizadoEm:
           periodo?.inicio || periodo?.fim ? finalizadoEm : { not: null },
       },
-      select: { iniciadoExecucaoEm: true, finalizadoEm: true },
+      select: {
+        iniciadoExecucaoEm: true,
+        finalizadoEm: true,
+        // Só os serviços que foram de fato executados (orçamento aprovado).
+        orcamentos: {
+          where: { status: 'APROVADO' },
+          select: {
+            servicos: { select: { servicoId: true, servico: { select: { nome: true } } } },
+          },
+        },
+      },
     });
     return registros
       .filter((r) => r.iniciadoExecucaoEm && r.finalizadoEm)
-      .map((r) => ({
-        iniciadoExecucaoEm: r.iniciadoExecucaoEm as Date,
-        finalizadoEm: r.finalizadoEm as Date,
-      }));
+      .map((r) => {
+        // Distingue serviços repetidos entre orçamentos (ex.: inicial + adicional).
+        const servicos = new Map<string, string>();
+        for (const orc of r.orcamentos) {
+          for (const s of orc.servicos) {
+            servicos.set(s.servicoId, s.servico.nome);
+          }
+        }
+        return {
+          iniciadoExecucaoEm: r.iniciadoExecucaoEm as Date,
+          finalizadoEm: r.finalizadoEm as Date,
+          servicos: [...servicos].map(([id, nome]) => ({ id, nome })),
+        };
+      });
   }
 
   private mapear(r: OrdemCompleta): OrdemServico {
