@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import type { StringValue } from 'ms';
 import { AcompanhamentoToken } from '../dominio/portas';
 
 /** Marca o token como sendo de acompanhamento (e não um login de operador). */
@@ -25,10 +26,11 @@ export class JwtAcompanhamentoToken implements AcompanhamentoToken {
   ) {}
 
   async gerar(osId: string): Promise<string> {
+    // expiresIn é uma duração (ex.: '7d'); o @nestjs/jwt v11 exige o tipo do `ms`.
     const expiresIn = this.config.get<string>(
       'ACOMPANHAMENTO_TOKEN_EXPIRES_IN',
       '7d',
-    );
+    ) as StringValue;
     return this.jwt.signAsync({ osId, escopo: ESCOPO }, { expiresIn });
   }
 

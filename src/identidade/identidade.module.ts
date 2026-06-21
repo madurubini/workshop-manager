@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import type { StringValue } from 'ms';
 import { AutenticarUsuario } from './aplicacao/autenticar-usuario.usecase';
 import { CadastrarUsuario } from './aplicacao/cadastrar-usuario.usecase';
 import { BcryptHashDeSenha } from './infraestrutura/bcrypt-hash-de-senha';
@@ -34,7 +35,7 @@ import { UsuariosController } from './interfaces/usuarios.controller';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRES_IN', '3600s'),
+          expiresIn: config.get<string>('JWT_EXPIRES_IN', '3600s') as StringValue,
         },
       }),
     }),
