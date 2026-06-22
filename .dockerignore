@@ -3,6 +3,7 @@ node_modules
 dist
 build
 coverage
+.scannerwork
 
 # Git e IDE
 .git
@@ -21,6 +22,8 @@ docs
 .eslintrc.js
 .prettierrc
 docker-compose.yml
+docker-compose.sonar.yml
+sonar-project.properties
 *.log
 
 # Mantidos de propósito (a imagem precisa): prisma/, docker-entrypoint.sh,
