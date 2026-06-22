@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CompartilhadoModule } from './compartilhado/compartilhado.module';
+import { HealthModule } from './health/health.module';
 import { IdentidadeModule } from './identidade/identidade.module';
 import { ClientesVeiculosModule } from './clientes-veiculos/clientes-veiculos.module';
 import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
@@ -24,6 +25,7 @@ import { NotificacoesModule } from './notificacoes/notificacoes.module';
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     CompartilhadoModule,
+    HealthModule,
     IdentidadeModule,
     ClientesVeiculosModule,
     CatalogoServicosModule,

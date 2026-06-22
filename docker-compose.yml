@@ -33,6 +33,19 @@ services:
       JWT_EXPIRES_IN: '3600s'
     ports:
       - '3000:3000'
+    healthcheck:
+      # Usa o fetch nativo do Node 20 (a imagem slim não tem curl/wget).
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   oficina-pgdata:
