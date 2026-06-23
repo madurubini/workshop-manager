@@ -5,16 +5,27 @@ construído com **Domain-Driven Design** num **monolito modular** (NestJS + Pris
 
 A linguagem ubíqua, o contrato de API e o modelo de dados estão em [`docs/`](docs/)
 (`linguagem-ubiqua.md`, `contrato-api.md`, `schema.prisma`) — a fonte de verdade do domínio.
-Há ainda uma [nota de segurança do `npm audit`](docs/seguranca-npm-audit.md).
+Há ainda o [relatório de análise de vulnerabilidades](docs/relatorio-vulnerabilidades.md)
+(`npm audit` + SonarQube) e o [guia do SonarQube](docs/sonarqube.md).
+
+## Objetivo
+
+Apoiar a oficina do **recebimento do veículo à entrega**: cadastrar clientes/veículos,
+abrir uma **Ordem de Serviço**, registrar o diagnóstico, montar e aprovar **orçamentos**
+(inclusive adicionais descobertos na execução), controlar o **estoque de peças** (reserva,
+encomenda e baixa) e manter o cliente informado por **notificações** — tudo com as regras
+de negócio (invariantes) protegidas no domínio. O cliente acompanha a OS por um link
+público, sem login. É um **MVP de back-end**: API REST documentada no Swagger, sem front-end.
 
 ## Stack
 
-- **TypeScript + NestJS 10**
+- **TypeScript + NestJS 11**
 - **Postgres 16 + Prisma 5**
-- **Jest** — 160 testes; cobertura ≥ 80% nos domínios críticos (`dominio/` + `aplicacao/`)
+- **Jest** — 173 testes unitários + 7 e2e; cobertura ≥ 80% nos domínios críticos (`dominio/` + `aplicacao/`)
 - **Swagger** (`@nestjs/swagger`) em `/api/docs`
 - **JWT** (`@nestjs/jwt` + Passport) nas rotas administrativas
 - **@nestjs/event-emitter** — event bus in-process · **@nestjs/schedule** — reenvio periódico
+- **@nestjs/terminus** — health check em `/health`
 - **Docker** (`Dockerfile` multi-stage + `docker-compose.yml`)
 
 ## Por que Postgres? (justificativa do banco)
@@ -67,35 +78,52 @@ acontece de duas formas:
 
 ## Como rodar
 
-### Opção 1 — Docker (app + Postgres com um comando)
+### Opção 1 — Docker (recomendado: app + Postgres com um comando)
+
+A forma mais simples de subir tudo. Requer **apenas Docker** instalado — não precisa de Node
+nem Postgres na máquina.
 
 ```bash
 docker compose up --build
 ```
 
-No start, o container aplica as **migrations versionadas** (`prisma migrate deploy`), roda o seed e sobe a API.
+No start, o container aplica as **migrations versionadas** (`prisma migrate deploy`), roda o
+seed (usuário + dados de exemplo) e sobe a API. Quando aparecer `Nest application successfully
+started`, está pronto:
 
-- API: http://localhost:3000/api/v1
-- Swagger: http://localhost:3000/api/docs
-- Postgres exposto no host em **5433** (para não colidir com um Postgres já na 5432).
+- **API:** http://localhost:3000/api/v1
+- **Swagger (documentação interativa):** http://localhost:3000/api/docs
+- **Health check:** http://localhost:3000/api/v1/health → `{"status":"ok"}`
+- **Postgres** exposto no host em **5433** (para não colidir com um Postgres já na 5432).
 
-> Migrando de uma versão que usava `prisma db push`? Rode `docker compose down -v` uma vez para recriar o volume do banco limpo (o `migrate deploy` espera aplicar do zero).
+Para rodar em segundo plano use `docker compose up --build -d`; para encerrar, `docker compose
+down` (ou `down -v` para apagar também o volume do banco).
 
-### Opção 2 — Local (Node 18+)
+> Migrando de uma versão que usava `prisma db push`? Rode `docker compose down -v` uma vez para
+> recriar o volume do banco limpo (o `migrate deploy` espera aplicar do zero).
+
+> **Ambiente:** o acesso host→container do Postgres exige a **VPN desligada** — com VPN ligada
+> o host não alcança o container e as chamadas travam.
+
+### Opção 2 — Local (Node 20)
+
+Para desenvolver com hot-reload (`start:dev`). Requer **Node 20** e um Postgres acessível.
 
 ```bash
 cp .env.example .env          # ajuste DATABASE_URL e JWT_SECRET se quiser
+docker compose up -d db       # sobe só o Postgres (localhost:5433); ou use um Postgres próprio
 npm install
-npm run prisma:generate
-npm run prisma:deploy         # aplica as migrations (prisma migrate deploy)
-npm run seed
-npm run start:dev
+npm run prisma:generate       # gera o Prisma Client
+npm run prisma:deploy         # aplica as migrations no banco
+npm run seed                  # cria o usuário gestor + serviços/peças de exemplo
+npm run start:dev             # API em watch — http://localhost:3000/api/v1
 ```
 
-> O schema é versionado em `prisma/migrations/`. Para criar uma **nova** migration ao mudar o `schema.prisma`: `npm run prisma:migrate` (gera o arquivo SQL e aplica em dev).
+> **Node 20** é obrigatório (o `package.json` declara `engines.node >= 20`). Com nvm:
+> `nvm use 20` (ou prefixe os comandos com o PATH da versão instalada).
 
-> Requer um Postgres acessível na `DATABASE_URL`. Para subir só o banco:
-> `docker compose up db` (fica em `localhost:5433`).
+> O schema é versionado em `prisma/migrations/`. Para criar uma **nova** migration ao mudar o
+> `schema.prisma`: `npm run prisma:migrate` (gera o arquivo SQL e aplica em dev).
 
 ## Autenticação
 
@@ -143,6 +171,9 @@ Base `/api/v1`. Detalhes e schemas no Swagger.
 - `GET /acompanhamento/{osId}`
 - `POST .../orcamentos/{orcamentoId}/resposta` (`{ aprovado, justificativa? }`) — inicial ou adicional; roteia para aprovar/recusar
 
+**Infra (público):**
+- `GET /health` — liveness/readiness (verifica a conexão com o banco via `@nestjs/terminus`)
+
 > **Comando automático não é rota:** reservar, encomendar, baixar, gerar orçamento, mudar
 > status e reenviar notificação são efeitos disparados por política/evento dentro das ações
 > acima — nunca endpoints próprios.
@@ -158,13 +189,46 @@ Status: 400 (validação), 401/403 (auth), 404, 409 (conflito), 422 (transição
 ## Testes
 
 ```bash
-npm test          # unitários (domínio + aplicação) — 160 testes
-npm run test:cov  # com cobertura (threshold de 80%)
-npm run test:e2e  # end-to-end (fluxo HTTP de autenticação)
+npm test          # unitários (domínio + aplicação) — 173 testes
+npm run test:cov  # com cobertura (threshold GLOBAL de 80%)
+npm run test:e2e  # end-to-end — 7 testes (auth, health e fluxo da OS via HTTP)
 ```
+
+Os testes de domínio rodam **sem banco nem HTTP** (mockam portas/repositórios). A cobertura
+crítica está em `dominio/` + `aplicacao/`.
+
+## Análise estática e vulnerabilidades
+
+Duas frentes **complementares**:
+
+- **SCA — `npm audit`** (dependências / `node_modules`):
+
+  ```bash
+  npm audit                 # grafo completo (prod + dev)
+  npm audit --omit=dev      # só o que vai para produção
+  ```
+
+- **SAST — SonarQube** (o código que escrevemos): bugs, *code smells*, *security hotspots* e
+  *vulnerabilities*. Roda self-hosted via Docker. Passo a passo completo em
+  [`docs/sonarqube.md`](docs/sonarqube.md); em resumo:
+
+  ```bash
+  # pré-requisito do host (uma vez): sysctl -w vm.max_map_count=262144
+  docker compose -f docker-compose.sonar.yml up -d        # sobe o SonarQube em :9000
+  npm run test:cov                                        # gera coverage/lcov.info
+  docker run --rm --network host \
+    -e SONAR_HOST_URL=http://localhost:9000 -e SONAR_TOKEN=<token> \
+    -v "$PWD:/usr/src" sonarsource/sonar-scanner-cli \
+    -Dsonar.scm.disabled=true                             # flag necessária em git worktree
+  # resultado em http://localhost:9000 (1º acesso: admin/admin, troque a senha)
+  ```
+
+O resultado consolidado está no [relatório de vulnerabilidades](docs/relatorio-vulnerabilidades.md)
+(Quality Gate **PASSED**, 0 vulnerabilidades no código; nenhuma vulnerabilidade alta/crítica
+nas dependências).
 
 ## Segurança
 
 JWT nas rotas admin; `/acompanhamento` público por token da OS; validação de CPF/CNPJ e placa
-no domínio; `npm audit` documentado em [`docs/seguranca-npm-audit.md`](docs/seguranca-npm-audit.md)
-(sem vulnerabilidades críticas).
+no domínio; senhas gravadas só como hash (bcrypt). Análise de dependências e de código descrita
+acima e no [relatório de vulnerabilidades](docs/relatorio-vulnerabilidades.md).
