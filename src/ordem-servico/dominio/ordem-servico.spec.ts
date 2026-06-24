@@ -403,6 +403,19 @@ describe('Pagamento e entrega', () => {
     expect(os.status).toBe(StatusOS.FINALIZADA);
   });
 
+  it('entrega de OS cancelada falha por transição inválida (não por pagamento)', () => {
+    const os = abrirOS();
+    os.registrarDiagnostico({
+      servicos: [servico()],
+      pecas: [],
+      orcamentoId: 'orc-1',
+    });
+    os.enviarOrcamento();
+    os.recusarOrcamento('orc-1', 'caro', 'cliente');
+    expect(os.status).toBe(StatusOS.CANCELADA);
+    expect(() => os.entregar('recepcionista')).toThrow(ErroTransicaoInvalida);
+  });
+
   it('entrega após pago: → Entregue e emite veiculo-entregue', () => {
     const os = osFinalizada();
     os.marcarPago();

@@ -368,6 +368,14 @@ export class OrdemServico extends AgregadoRaiz<string> {
    * confirmado — regra: reter o veículo até o pagamento.
    */
   entregar(por?: string | null): void {
+    // Checa o estado ANTES do pagamento: uma OS que não pode ser entregue
+    // (ex.: cancelada) deve falhar com transição inválida, não com uma
+    // mensagem sobre pagamento que mascara a causa real.
+    if (!transicaoPermitida(this.props.status, StatusOS.ENTREGUE)) {
+      throw new ErroTransicaoInvalida(
+        `Transição inválida: de ${this.props.status} para ${StatusOS.ENTREGUE}.`,
+      );
+    }
     if (!this.props.pago) {
       throw new ErroValidacao(
         'A entrega exige pagamento confirmado (pago = true).',
