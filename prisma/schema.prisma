@@ -88,9 +88,10 @@ model Peca {
   ativo         Boolean  @default(true)
   // disponivel é derivado; pode virar uma coluna gerada no Postgres se preferir
 
-  orcados  PecaOrcada[]
-  reservas ReservaEstoque[]
-  cotacoes Cotacao[]
+  orcados    PecaOrcada[]
+  reservas   ReservaEstoque[]
+  cotacoes   Cotacao[]
+  encomendas Encomenda[]
 
   @@map("peca")
 }
@@ -126,6 +127,26 @@ model Cotacao {
   @@map("cotacao")
 }
 
+// Encomenda de peça em falta, criada ao aprovar um orçamento com peça EM_COTACAO.
+// Liga peça ↔ OS para que, na ENTRADA da peça no estoque, saibamos qual OS aguardava.
+// Atendida (RESERVADA) quando há saldo; PENDENTE até chegar; CANCELADA se a OS cair.
+model Encomenda {
+  id         String    @id @default(uuid()) @db.Uuid
+  pecaId     String    @db.Uuid
+  ordemId    String    @db.Uuid
+  quantidade Int
+  status     String    @default("PENDENTE") // PENDENTE | RECEBIDA | CANCELADA
+  criadoEm   DateTime  @default(now())
+  recebidaEm DateTime?
+
+  peca  Peca         @relation(fields: [pecaId], references: [id])
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@index([pecaId, status])
+  @@index([ordemId])
+  @@map("encomenda")
+}
+
 // ─────────────────────────── Ordem de Serviço ──────────────────────────────
 
 model OrdemServico {
@@ -148,6 +169,7 @@ model OrdemServico {
   historico  HistoricoStatus[]
   reservas   ReservaEstoque[]
   cotacoes   Cotacao[]
+  encomendas Encomenda[]
 
   @@index([clienteId])
   @@index([veiculoId])

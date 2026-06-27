@@ -211,7 +211,9 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
         orcamentos: {
           where: { status: 'APROVADO' },
           select: {
-            servicos: { select: { servicoId: true, servico: { select: { nome: true } } } },
+            servicos: {
+              select: { servicoId: true, servico: { select: { nome: true } } },
+            },
           },
         },
       },

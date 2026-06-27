@@ -13,6 +13,7 @@ import {
   OrcamentoGerado,
   OrcamentoRecusado,
   OSAberta,
+  OSCancelada,
   PagamentoConfirmado,
   StatusOSAlterado,
   VeiculoEntregue,
@@ -110,7 +111,9 @@ export class OrdemServico extends AgregadoRaiz<string> {
 
   /**
    * Transição de status protegida pela máquina de estados. Rejeita transições
-   * fora da ordem válida, grava o histórico e registra o evento.
+   * fora da ordem válida, grava o histórico e registra o evento. O início real
+   * da execução (`iniciadoExecucaoEm`) é marcado aqui, no momento em que a OS
+   * entra em Em execução — seja direto da aprovação ou após a peça chegar.
    */
   transicionarPara(novo: StatusOS, por?: string | null): void {
     if (!transicaoPermitida(this.props.status, novo)) {
@@ -120,12 +123,18 @@ export class OrdemServico extends AgregadoRaiz<string> {
     }
     const anterior = this.props.status;
     this.props.status = novo;
+    if (novo === StatusOS.EM_EXECUCAO && !this.props.iniciadoExecucaoEm) {
+      this.props.iniciadoExecucaoEm = new Date();
+    }
     this.props.historico.push({
       status: novo,
       em: new Date(),
       por: por ?? null,
     });
     this.registrarEvento(new StatusOSAlterado(this.id, anterior, novo));
+    if (novo === StatusOS.CANCELADA) {
+      this.registrarEvento(new OSCancelada(this.id));
+    }
   }
 
   /**
@@ -207,8 +216,10 @@ export class OrdemServico extends AgregadoRaiz<string> {
    * Cliente APROVA um orçamento (inicial ou adicional). Marca as peças daquele
    * orçamento (DISPONIVEL → RESERVADA, EM_COTACAO → ENCOMENDADA) e emite o
    * evento com a situação ORIGINAL, para o Estoque reservar/encomendar.
-   * Se for o INICIAL, leva a OS para Em execução; se for ADICIONAL, a OS
-   * continua em execução (só libera o trabalho extra).
+   * Se for o INICIAL, leva a OS para Em execução — ou para Aguardando peça,
+   * quando alguma peça precisou ser encomendada (a execução só começa quando a
+   * peça chega). Se for ADICIONAL, a OS continua em execução (só libera o
+   * trabalho extra); a finalização é que ficará barrada até a peça chegar.
    */
   aprovarOrcamento(orcamentoId: string, por?: string | null): void {
     const orcamento = this.orcamentoNoEstado(
@@ -223,8 +234,10 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.reservarPecasDoOrcamento(orcamento);
 
     if (orcamento.tipo === TipoOrcamento.INICIAL) {
-      this.props.iniciadoExecucaoEm = new Date();
-      this.transicionarPara(StatusOS.EM_EXECUCAO, por);
+      const destino = this.temPecaEncomendada()
+        ? StatusOS.AGUARDANDO_PECA
+        : StatusOS.EM_EXECUCAO;
+      this.transicionarPara(destino, por);
     }
 
     this.registrarEvento(
@@ -327,15 +340,55 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
 
   /**
+   * Estoque avisa que uma peça encomendada chegou e foi reservada para esta OS.
+   * Marca as linhas ENCOMENDADA daquela peça (nos orçamentos aprovados) como
+   * RESERVADA e, se a OS estava Aguardando peça e não resta mais nenhuma peça
+   * encomendada, retoma a execução. Idempotente: peça já reservada não faz nada.
+   */
+  registrarRecebimentoDePeca(pecaId: string, por?: string | null): void {
+    let alterou = false;
+    for (const orcamento of this.props.orcamentos) {
+      if (orcamento.status !== StatusOrcamento.APROVADO) {
+        continue;
+      }
+      for (const peca of orcamento.pecas) {
+        if (
+          peca.pecaId === pecaId &&
+          peca.situacao === SituacaoPecaOrcada.ENCOMENDADA
+        ) {
+          peca.situacao = SituacaoPecaOrcada.RESERVADA;
+          alterou = true;
+        }
+      }
+    }
+
+    if (!alterou) {
+      return;
+    }
+
+    if (
+      this.props.status === StatusOS.AGUARDANDO_PECA &&
+      !this.temPecaEncomendada()
+    ) {
+      this.transicionarPara(StatusOS.EM_EXECUCAO, por);
+    }
+  }
+
+  /**
    * Mecânico conclui a execução. Bloqueia se houver orçamento aguardando
-   * resposta (regra: só finaliza sem orçamento pendente). Registra o tempo e
-   * leva a OS para Finalizada; o evento dispara a baixa do estoque das peças
-   * reservadas.
+   * resposta (regra: só finaliza sem orçamento pendente) ou peça encomendada
+   * ainda por chegar. Registra o tempo e leva a OS para Finalizada; o evento
+   * dispara a baixa do estoque das peças reservadas.
    */
   concluirExecucao(por?: string | null): void {
     if (this.temOrcamentoPendente()) {
       throw new ErroValidacao(
         'Há orçamento aguardando resposta do cliente; não é possível concluir.',
+      );
+    }
+    if (this.temPecaEncomendada()) {
+      throw new ErroValidacao(
+        'Há peça encomendada aguardando chegada; não é possível concluir.',
       );
     }
     this.props.finalizadoEm = new Date();
@@ -428,6 +481,15 @@ export class OrdemServico extends AgregadoRaiz<string> {
           ? SituacaoPecaOrcada.RESERVADA
           : SituacaoPecaOrcada.ENCOMENDADA;
     }
+  }
+
+  /** Há peça encomendada (aguardando chegar) em algum orçamento aprovado? */
+  private temPecaEncomendada(): boolean {
+    return this.props.orcamentos.some(
+      (o) =>
+        o.status === StatusOrcamento.APROVADO &&
+        o.pecas.some((p) => p.situacao === SituacaoPecaOrcada.ENCOMENDADA),
+    );
   }
 
   /** Há orçamento ainda não decidido pelo cliente (GERADO ou ENVIADO)? */

@@ -6,6 +6,7 @@ import {
 } from '../../compartilhado/erros/erros-dominio';
 import { Peca } from '../dominio/peca';
 import { PECA_REPOSITORY, PecaRepository } from '../dominio/repositorios';
+import { AtenderEncomendasDaPeca } from './atender-encomendas.service';
 
 @Injectable()
 export class CadastrarPeca {
@@ -72,6 +73,7 @@ export class AjustarEstoque {
   constructor(
     @Inject(PECA_REPOSITORY)
     private readonly pecas: PecaRepository,
+    private readonly atenderEncomendas: AtenderEncomendasDaPeca,
   ) {}
 
   async executar(entrada: {
@@ -87,6 +89,10 @@ export class AjustarEstoque {
       `Ajuste ${entrada.tipo} de ${entrada.quantidade} na peça ${entrada.id}` +
         (entrada.motivo ? ` (motivo: ${entrada.motivo})` : ''),
     );
+    // Entrada de saldo pode liberar encomendas que aguardavam esta peça.
+    if (entrada.tipo === 'ENTRADA') {
+      await this.atenderEncomendas.executar(peca.id);
+    }
     return peca;
   }
 }

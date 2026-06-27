@@ -43,6 +43,16 @@ export class StatusOSAlterado extends EventoDominio {
   }
 }
 
+/** OS cancelada (→ estoque cancela encomendas pendentes da OS). */
+export class OSCancelada extends EventoDominio {
+  constructor(readonly ordemId: string) {
+    super();
+  }
+  get nomeEvento(): string {
+    return 'ordem-servico.os-cancelada';
+  }
+}
+
 /** Diagnóstico concluído (serviços e peças registrados). */
 export class DiagnosticoConcluido extends EventoDominio {
   constructor(readonly ordemId: string) {

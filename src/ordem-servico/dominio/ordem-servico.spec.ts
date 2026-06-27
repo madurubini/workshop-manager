@@ -212,14 +212,16 @@ describe('Ciclo de vida do orçamento inicial', () => {
     expect(() => os.enviarOrcamento()).toThrow(ErroTransicaoInvalida);
   });
 
-  it('aprovar: ENVIADO → APROVADO, OS → Em execução, peças reservada/encomendada', () => {
+  it('aprovar com peça em cotação: APROVADO, OS → Aguardando peça, peças reservada/encomendada', () => {
     const os = osComOrcamento();
     os.enviarOrcamento();
     os.puxarEventos();
 
     os.aprovarOrcamento('orc-1', 'cliente');
 
-    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    // Há peça encomendada (pecaCotada), então a execução não começa ainda.
+    expect(os.status).toBe(StatusOS.AGUARDANDO_PECA);
+    expect(os.iniciadoExecucaoEm).toBeNull();
     expect(os.orcamento?.status).toBe(StatusOrcamento.APROVADO);
     expect(os.orcamento?.pecas[0].situacao).toBe(SituacaoPecaOrcada.RESERVADA);
     expect(os.orcamento?.pecas[1].situacao).toBe(
@@ -249,14 +251,88 @@ describe('Ciclo de vida do orçamento inicial', () => {
 
     expect(os.status).toBe(StatusOS.CANCELADA);
     expect(os.orcamento?.status).toBe(StatusOrcamento.RECUSADO);
-    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
-      'ordem-servico.orcamento-recusado',
-    );
+    const nomes = os.puxarEventos().map((e) => e.nomeEvento);
+    expect(nomes).toContain('ordem-servico.orcamento-recusado');
+    expect(nomes).toContain('ordem-servico.os-cancelada');
   });
 
   it('não aprova um orçamento que não foi enviado', () => {
     const os = osComOrcamento(); // orçamento GERADO, não ENVIADO
     expect(() => os.aprovarOrcamento('orc-1')).toThrow(ErroTransicaoInvalida);
+  });
+});
+
+describe('Aguardando peça e recebimento', () => {
+  function osComPecas(pecas: PecaOrcada[]): OrdemServico {
+    const os = abrirOS();
+    os.registrarDiagnostico({
+      servicos: [servico()],
+      pecas,
+      orcamentoId: 'orc-1',
+    });
+    os.enviarOrcamento();
+    os.puxarEventos();
+    return os;
+  }
+
+  it('aprovar com tudo disponível: OS → Em execução e marca o início', () => {
+    const os = osComPecas([peca({ situacao: SituacaoPecaOrcada.DISPONIVEL })]);
+    os.aprovarOrcamento('orc-1', 'cliente');
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(os.iniciadoExecucaoEm).toBeInstanceOf(Date);
+  });
+
+  it('recebimento parcial mantém Aguardando peça; a última peça retoma a execução', () => {
+    const os = osComPecas([
+      peca({
+        id: 'ip1',
+        pecaId: 'p1',
+        situacao: SituacaoPecaOrcada.EM_COTACAO,
+      }),
+      peca({
+        id: 'ip2',
+        pecaId: 'p2',
+        situacao: SituacaoPecaOrcada.EM_COTACAO,
+      }),
+    ]);
+    os.aprovarOrcamento('orc-1', 'cliente');
+    expect(os.status).toBe(StatusOS.AGUARDANDO_PECA);
+    os.puxarEventos();
+
+    os.registrarRecebimentoDePeca('p1');
+    expect(os.status).toBe(StatusOS.AGUARDANDO_PECA);
+    expect(os.orcamento?.pecas[0].situacao).toBe(SituacaoPecaOrcada.RESERVADA);
+    expect(os.orcamento?.pecas[1].situacao).toBe(
+      SituacaoPecaOrcada.ENCOMENDADA,
+    );
+    expect(os.puxarEventos()).toHaveLength(0); // nada de transição ainda
+
+    os.registrarRecebimentoDePeca('p2', 'estoque');
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(os.iniciadoExecucaoEm).toBeInstanceOf(Date);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.status-alterado',
+    );
+  });
+
+  it('recebimento é idempotente e ignora peça que não está na OS', () => {
+    const os = osComPecas([
+      peca({
+        id: 'ip1',
+        pecaId: 'p1',
+        situacao: SituacaoPecaOrcada.EM_COTACAO,
+      }),
+    ]);
+    os.aprovarOrcamento('orc-1', 'cliente');
+    os.registrarRecebimentoDePeca('p1');
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    os.puxarEventos();
+
+    // de novo a mesma peça (já reservada) e uma peça inexistente: sem efeito
+    os.registrarRecebimentoDePeca('p1');
+    os.registrarRecebimentoDePeca('p9');
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(os.puxarEventos()).toHaveLength(0);
   });
 });
 
@@ -329,6 +405,32 @@ describe('Execução e orçamento adicional', () => {
     expect(orc2.status).toBe(StatusOrcamento.RECUSADO);
     expect(os.orcamento!.total).toBe(totalInicial);
     os.concluirExecucao();
+    expect(os.status).toBe(StatusOS.FINALIZADA);
+  });
+
+  it('adicional com peça encomendada bloqueia a conclusão até a peça chegar', () => {
+    const os = osEmExecucao();
+    os.adicionarOrcamentoAdicional({
+      id: 'orc-2',
+      descricao: 'Bomba',
+      servicos: [],
+      pecas: [
+        peca({
+          id: 'ip2',
+          pecaId: 'p2',
+          descricao: 'Bomba',
+          quantidade: 1,
+          situacao: SituacaoPecaOrcada.EM_COTACAO,
+        }),
+      ],
+    });
+    os.aprovarOrcamento('orc-2');
+    // ADICIONAL não muda o status: segue em execução, mas com peça encomendada.
+    expect(os.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(() => os.concluirExecucao()).toThrow(ErroValidacao);
+
+    os.registrarRecebimentoDePeca('p2');
+    os.concluirExecucao('mecanico');
     expect(os.status).toBe(StatusOS.FINALIZADA);
   });
 

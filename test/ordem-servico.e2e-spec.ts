@@ -34,6 +34,8 @@ process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '3600s';
 
 const SERVICO_ID = '11111111-1111-4111-8111-111111111111';
 const PECA_ID = '33333333-3333-4333-8333-333333333333';
+// Peça sem saldo: força o diagnóstico a cotar (EM_COTACAO) e a OS a Aguardando peça.
+const PECA_ESCASSA_ID = '44444444-4444-4444-8444-444444444444';
 
 describe('Fluxo da OS (e2e — integração com Postgres)', () => {
   let app: INestApplication;
@@ -80,6 +82,15 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
         nome: 'Filtro de óleo',
         precoUnitario: 35,
         saldoFisico: 10,
+      },
+    });
+    await prisma.peca.create({
+      data: {
+        id: PECA_ESCASSA_ID,
+        codigo: 'BOMBA-DAGUA',
+        nome: 'Bomba d’água',
+        precoUnitario: 200,
+        saldoFisico: 0, // em falta: vira encomenda na aprovação
       },
     });
   }, 60000);
@@ -184,6 +195,116 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
       .set(auth)
       .expect(200);
     expect(entrega.body.status).toBe('Entregue');
+  }, 30000);
+
+  it('peça em falta: aprovar leva a Aguardando peça; a entrada no estoque retoma a execução', async () => {
+    const http = request(app.getHttpServer());
+    const base = '/api/v1';
+
+    // Login
+    const login = await http
+      .post(`${base}/auth/login`)
+      .send({ username: 'gestor', senha: 'gestor123' })
+      .expect(200);
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+
+    // Cliente + veículo
+    const cli = await http
+      .post(`${base}/clientes`)
+      .set(auth)
+      .send({ documento: '390.533.447-05', nome: 'Ana' })
+      .expect(201);
+    const veic = await http
+      .post(`${base}/clientes/${cli.body.id}/veiculos`)
+      .set(auth)
+      .send({ placa: 'QWE9F88', marca: 'Ford', modelo: 'Ka', ano: 2020 })
+      .expect(201);
+
+    // Abrir OS
+    const os = await http
+      .post(`${base}/ordens-servico`)
+      .set(auth)
+      .send({
+        clienteId: cli.body.id,
+        veiculoId: veic.body.id,
+        problemaRelatado: 'Vazamento no motor',
+      })
+      .expect(201);
+    const osId = os.body.id;
+
+    // Diagnóstico com a peça SEM saldo → linha EM_COTACAO (preço cotado)
+    const diag = await http
+      .post(`${base}/ordens-servico/${osId}/diagnostico`)
+      .set(auth)
+      .send({
+        servicos: [{ servicoId: SERVICO_ID, quantidade: 1 }],
+        pecas: [{ pecaId: PECA_ESCASSA_ID, quantidade: 1 }],
+      })
+      .expect(200);
+    const orcamentoId = diag.body.orcamento.id;
+    const pecaOrcada = diag.body.orcamento.pecas.find(
+      (p: { pecaId: string }) => p.pecaId === PECA_ESCASSA_ID,
+    );
+    expect(pecaOrcada.situacao).toBe('EM_COTACAO');
+
+    // Enviar e aprovar (token de acompanhamento)
+    await http
+      .post(`${base}/ordens-servico/${osId}/orcamento/enviar`)
+      .set(auth)
+      .expect(200);
+    const acomp = app.get<AcompanhamentoToken>(ACOMPANHAMENTO_TOKEN);
+    const tokenCliente = await acomp.gerar(osId);
+    const aprov = await http
+      .post(`${base}/acompanhamento/${osId}/orcamentos/${orcamentoId}/resposta`)
+      .set({ Authorization: `Bearer ${tokenCliente}` })
+      .send({ aprovado: true })
+      .expect(200);
+
+    // Peça encomendada → OS aguardando peça (execução ainda não começou)
+    expect(aprov.body.status).toBe('Aguardando peça');
+
+    // Nada reservado ainda (a peça não existe no estoque)
+    const pecaAntes = await http
+      .get(`${base}/pecas/${PECA_ESCASSA_ID}`)
+      .set(auth)
+      .expect(200);
+    expect(pecaAntes.body.reservado).toBe(0);
+    expect(pecaAntes.body.saldoFisico).toBe(0);
+
+    // Conclusão é barrada enquanto a peça não chega
+    await http
+      .post(`${base}/ordens-servico/${osId}/execucao/concluir`)
+      .set(auth)
+      .expect(400);
+
+    // ENTRADA da peça no estoque → atende a encomenda e retoma a execução
+    const ajuste = await http
+      .patch(`${base}/pecas/${PECA_ESCASSA_ID}/estoque`)
+      .set(auth)
+      .send({ tipo: 'ENTRADA', quantidade: 1, motivo: 'Recebimento de compra' })
+      .expect(200);
+    // Entrou 1 e foi imediatamente reservado para a OS
+    expect(ajuste.body.saldoFisico).toBe(1);
+    expect(ajuste.body.reservado).toBe(1);
+
+    // A OS retomou sozinha para Em execução
+    const acompOS = await http
+      .get(`${base}/acompanhamento/${osId}`)
+      .expect(200);
+    expect(acompOS.body.status).toBe('Em execução');
+
+    // Agora conclui e baixa a peça
+    const concl = await http
+      .post(`${base}/ordens-servico/${osId}/execucao/concluir`)
+      .set(auth)
+      .expect(200);
+    expect(concl.body.status).toBe('Finalizada');
+    const pecaFim = await http
+      .get(`${base}/pecas/${PECA_ESCASSA_ID}`)
+      .set(auth)
+      .expect(200);
+    expect(pecaFim.body.saldoFisico).toBe(0); // 1 - 1
+    expect(pecaFim.body.reservado).toBe(0);
   }, 30000);
 
   it('rejeita aprovar com token de acompanhamento de OUTRA OS (anti-IDOR)', async () => {

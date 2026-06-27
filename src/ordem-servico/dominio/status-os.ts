@@ -2,15 +2,18 @@
  * Status da OS (value object) e a máquina de estados do agregado.
  *
  * A ordem válida (linguagem ubíqua):
- *   Recebida → Em diagnóstico → Aguardando aprovação → Em execução
- *            → Finalizada → Entregue
- * Qualquer estado "vivo" pode ir para Cancelada. Transições fora desse mapa
- * são rejeitadas (no contrato, viram HTTP 422).
+ *   Recebida → Em diagnóstico → Aguardando aprovação → [Aguardando peça] →
+ *   Em execução → Finalizada → Entregue
+ * "Aguardando peça" é um desvio opcional após a aprovação: a OS só entra em
+ * execução quando todas as peças encomendadas chegam ao estoque. Qualquer
+ * estado "vivo" pode ir para Cancelada. Transições fora desse mapa são
+ * rejeitadas (no contrato, viram HTTP 422).
  */
 export enum StatusOS {
   RECEBIDA = 'RECEBIDA',
   EM_DIAGNOSTICO = 'EM_DIAGNOSTICO',
   AGUARDANDO_APROVACAO = 'AGUARDANDO_APROVACAO',
+  AGUARDANDO_PECA = 'AGUARDANDO_PECA',
   EM_EXECUCAO = 'EM_EXECUCAO',
   FINALIZADA = 'FINALIZADA',
   ENTREGUE = 'ENTREGUE',
@@ -24,7 +27,12 @@ const TRANSICOES: Record<StatusOS, StatusOS[]> = {
     StatusOS.AGUARDANDO_APROVACAO,
     StatusOS.CANCELADA,
   ],
-  [StatusOS.AGUARDANDO_APROVACAO]: [StatusOS.EM_EXECUCAO, StatusOS.CANCELADA],
+  [StatusOS.AGUARDANDO_APROVACAO]: [
+    StatusOS.AGUARDANDO_PECA,
+    StatusOS.EM_EXECUCAO,
+    StatusOS.CANCELADA,
+  ],
+  [StatusOS.AGUARDANDO_PECA]: [StatusOS.EM_EXECUCAO, StatusOS.CANCELADA],
   [StatusOS.EM_EXECUCAO]: [StatusOS.FINALIZADA, StatusOS.CANCELADA],
   [StatusOS.FINALIZADA]: [StatusOS.ENTREGUE],
   [StatusOS.ENTREGUE]: [],
@@ -40,6 +48,7 @@ export const ROTULO_STATUS: Record<StatusOS, string> = {
   [StatusOS.RECEBIDA]: 'Recebida',
   [StatusOS.EM_DIAGNOSTICO]: 'Em diagnóstico',
   [StatusOS.AGUARDANDO_APROVACAO]: 'Aguardando aprovação',
+  [StatusOS.AGUARDANDO_PECA]: 'Aguardando peça',
   [StatusOS.EM_EXECUCAO]: 'Em execução',
   [StatusOS.FINALIZADA]: 'Finalizada',
   [StatusOS.ENTREGUE]: 'Entregue',

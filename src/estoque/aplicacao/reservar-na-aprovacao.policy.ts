@@ -3,7 +3,12 @@ import { OnEvent } from '@nestjs/event-emitter';
 // Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
 import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
 import { FORNECEDOR, Fornecedor } from '../dominio/fornecedor';
-import { PECA_REPOSITORY, PecaRepository } from '../dominio/repositorios';
+import {
+  ENCOMENDA_REPOSITORY,
+  EncomendaRepository,
+  PECA_REPOSITORY,
+  PecaRepository,
+} from '../dominio/repositorios';
 
 /**
  * Política do Estoque: ao aprovar o orçamento, reserva as peças disponíveis e
@@ -24,6 +29,8 @@ export class ReservarNaAprovacao {
     private readonly pecas: PecaRepository,
     @Inject(FORNECEDOR)
     private readonly fornecedor: Fornecedor,
+    @Inject(ENCOMENDA_REPOSITORY)
+    private readonly encomendas: EncomendaRepository,
   ) {}
 
   // Vale para o orçamento INICIAL e os ADICIONAIS: ambos chegam aqui pelo
@@ -56,7 +63,14 @@ export class ReservarNaAprovacao {
       }
 
       // Peça em falta (EM_COTACAO) ou que perdeu a corrida: encomenda.
+      // Faz o pedido ao fornecedor E registra a pendência, para sabermos qual
+      // OS aguardava quando a peça der ENTRADA no estoque.
       await this.fornecedor.encomendar({
+        ordemId,
+        pecaId: item.pecaId,
+        quantidade: item.quantidade,
+      });
+      await this.encomendas.registrar({
         ordemId,
         pecaId: item.pecaId,
         quantidade: item.quantidade,

@@ -1,11 +1,12 @@
 import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
 import { Fornecedor } from '../dominio/fornecedor';
-import { PecaRepository } from '../dominio/repositorios';
+import { EncomendaRepository, PecaRepository } from '../dominio/repositorios';
 import { ReservarNaAprovacao } from './reservar-na-aprovacao.policy';
 
 describe('ReservarNaAprovacao (política do estoque)', () => {
   let pecas: jest.Mocked<PecaRepository>;
   let fornecedor: jest.Mocked<Fornecedor>;
+  let encomendas: jest.Mocked<EncomendaRepository>;
   let policy: ReservarNaAprovacao;
 
   beforeEach(() => {
@@ -18,7 +19,13 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       reservarAtomico: jest.fn(),
     };
     fornecedor = { cotar: jest.fn(), encomendar: jest.fn() };
-    policy = new ReservarNaAprovacao(pecas, fornecedor);
+    encomendas = {
+      registrar: jest.fn(),
+      listarPendentesDaPeca: jest.fn(),
+      marcarRecebida: jest.fn(),
+      cancelarPendentesDaOrdem: jest.fn(),
+    };
+    policy = new ReservarNaAprovacao(pecas, fornecedor, encomendas);
   });
 
   it('reserva atomicamente as peças disponíveis (sem encomendar)', async () => {
@@ -37,9 +44,10 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       quantidade: 4,
     });
     expect(fornecedor.encomendar).not.toHaveBeenCalled();
+    expect(encomendas.registrar).not.toHaveBeenCalled();
   });
 
-  it('encomenda as faltantes (em cotação) sem tentar reservar', async () => {
+  it('encomenda as faltantes (em cotação) e registra a pendência', async () => {
     const evento = {
       ordemId: 'os-1',
       itensPeca: [{ pecaId: 'p1', quantidade: 2, situacao: 'EM_COTACAO' }],
@@ -53,9 +61,14 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
       pecaId: 'p1',
       quantidade: 2,
     });
+    expect(encomendas.registrar).toHaveBeenCalledWith({
+      ordemId: 'os-1',
+      pecaId: 'p1',
+      quantidade: 2,
+    });
   });
 
-  it('cai para encomenda quando perde a corrida (reserva atômica falha)', async () => {
+  it('cai para encomenda (e registra) quando perde a corrida', async () => {
     pecas.reservarAtomico.mockResolvedValue(false); // disponível acabou
 
     const evento = {
@@ -67,6 +80,11 @@ describe('ReservarNaAprovacao (política do estoque)', () => {
 
     expect(pecas.reservarAtomico).toHaveBeenCalled();
     expect(fornecedor.encomendar).toHaveBeenCalledWith({
+      ordemId: 'os-1',
+      pecaId: 'p1',
+      quantidade: 4,
+    });
+    expect(encomendas.registrar).toHaveBeenCalledWith({
       ordemId: 'os-1',
       pecaId: 'p1',
       quantidade: 4,

@@ -4,6 +4,7 @@ import {
 } from '../../compartilhado/erros/erros-dominio';
 import { Peca } from '../dominio/peca';
 import { PecaRepository } from '../dominio/repositorios';
+import { AtenderEncomendasDaPeca } from './atender-encomendas.service';
 import {
   AjustarEstoque,
   AtualizarPeca,
@@ -20,6 +21,10 @@ function repo(): jest.Mocked<PecaRepository> {
     reservarAtomico: jest.fn(),
     listar: jest.fn(),
   };
+}
+
+function atender(): jest.Mocked<Pick<AtenderEncomendasDaPeca, 'executar'>> {
+  return { executar: jest.fn() };
 }
 
 function umaPeca(saldo = 10): Peca {
@@ -78,22 +83,43 @@ describe('CRUD de peça', () => {
     expect(p.ativo).toBe(false);
   });
 
-  it('ajusta estoque (entrada)', async () => {
+  it('ajusta estoque (entrada) e atende as encomendas da peça', async () => {
     const r = repo();
+    const a = atender();
     r.buscarPorId.mockResolvedValue(umaPeca(10));
-    const p = await new AjustarEstoque(r).executar({
+    const p = await new AjustarEstoque(
+      r,
+      a as unknown as AtenderEncomendasDaPeca,
+    ).executar({
       id: 'p1',
       tipo: 'ENTRADA',
       quantidade: 5,
     });
     expect(p.saldoFisico).toBe(15);
+    expect(a.executar).toHaveBeenCalledWith('p1');
+  });
+
+  it('ajuste de saída não tenta atender encomendas', async () => {
+    const r = repo();
+    const a = atender();
+    r.buscarPorId.mockResolvedValue(umaPeca(10));
+    await new AjustarEstoque(
+      r,
+      a as unknown as AtenderEncomendasDaPeca,
+    ).executar({ id: 'p1', tipo: 'SAIDA', quantidade: 3 });
+    expect(a.executar).not.toHaveBeenCalled();
   });
 
   it('ajuste falha quando não encontra a peça', async () => {
     const r = repo();
+    const a = atender();
     r.buscarPorId.mockResolvedValue(null);
     await expect(
-      new AjustarEstoque(r).executar({ id: 'x', tipo: 'SAIDA', quantidade: 1 }),
+      new AjustarEstoque(r, a as unknown as AtenderEncomendasDaPeca).executar({
+        id: 'x',
+        tipo: 'SAIDA',
+        quantidade: 1,
+      }),
     ).rejects.toBeInstanceOf(ErroNaoEncontrado);
   });
 });

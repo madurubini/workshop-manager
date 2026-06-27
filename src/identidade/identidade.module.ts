@@ -35,7 +35,10 @@ import { UsuariosController } from './interfaces/usuarios.controller';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: config.get<string>('JWT_EXPIRES_IN', '3600s') as StringValue,
+          expiresIn: config.get<string>(
+            'JWT_EXPIRES_IN',
+            '3600s',
+          ) as StringValue,
         },
       }),
     }),

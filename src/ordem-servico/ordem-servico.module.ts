@@ -18,6 +18,7 @@ import { OrdemServicoConsultaService } from './aplicacao/ordem-servico-consulta.
 import { RecusarOrcamento } from './aplicacao/recusar-orcamento.usecase';
 import { RegistrarDiagnostico } from './aplicacao/registrar-diagnostico.usecase';
 import { RelatorioTempoMedioExecucao } from './aplicacao/relatorio-tempo-medio.usecase';
+import { RetomarExecucaoAoReceberPeca } from './aplicacao/retomar-execucao.policy';
 import { ORDEM_SERVICO_REPOSITORY } from './dominio/repositorios';
 import { PrismaOrdemServicoRepository } from './infraestrutura/prisma-ordem-servico.repository';
 import { AcompanhamentoController } from './interfaces/acompanhamento.controller';
@@ -55,6 +56,7 @@ import { RelatoriosController } from './interfaces/relatorios.controller';
     ConfirmarPagamento,
     EntregarVeiculo,
     RelatorioTempoMedioExecucao,
+    RetomarExecucaoAoReceberPeca,
     {
       provide: ORDEM_SERVICO_REPOSITORY,
       useClass: PrismaOrdemServicoRepository,

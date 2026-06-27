@@ -54,7 +54,11 @@ export class RelatorioTempoMedioExecucao {
     for (const t of tempos) {
       const m = minutos(t);
       for (const s of t.servicos) {
-        const acc = porServico.get(s.id) ?? { nome: s.nome, soma: 0, ordens: 0 };
+        const acc = porServico.get(s.id) ?? {
+          nome: s.nome,
+          soma: 0,
+          ordens: 0,
+        };
         acc.soma += m;
         acc.ordens += 1;
         porServico.set(s.id, acc);

@@ -69,7 +69,7 @@ Exemplo do diagnóstico (a rota que mais concentra):
 | Método / Rota | O que faz |
 |---|---|
 | `GET /acompanhamento/{osId}` | Consulta **pública** (pelo id da OS): status, orçamentos (inicial + adicionais) e histórico. |
-| `POST /acompanhamento/{osId}/orcamentos/{orcamentoId}/resposta` | **Exige o token de acompanhamento da OS** (Bearer). Corpo `{ aprovado: bool, justificativa? }`. Vale para o orçamento **inicial** e os **adicionais** (identificados pelo `orcamentoId`). Inicial aprovado → Em execução + reserva/encomenda; inicial recusado → Cancelada. Adicional aprovado → reserva/encomenda o trabalho extra; adicional recusado → segue só com o aprovado. O controller roteia para dois casos de uso (Aprovar / Recusar). |
+| `POST /acompanhamento/{osId}/orcamentos/{orcamentoId}/resposta` | **Exige o token de acompanhamento da OS** (Bearer). Corpo `{ aprovado: bool, justificativa? }`. Vale para o orçamento **inicial** e os **adicionais** (identificados pelo `orcamentoId`). Inicial aprovado → Em execução (ou Aguardando peça, se alguma peça foi encomendada) + reserva/encomenda; inicial recusado → Cancelada. A OS sai de Aguardando peça para Em execução automaticamente quando as peças encomendadas dão entrada no estoque. Adicional aprovado → reserva/encomenda o trabalho extra; adicional recusado → segue só com o aprovado. O controller roteia para dois casos de uso (Aprovar / Recusar). |
 
 ---
 

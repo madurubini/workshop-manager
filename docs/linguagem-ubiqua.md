@@ -45,7 +45,9 @@ A OS carrega o ciclo de vida inteiro: abertura → diagnóstico → orçamento �
 | Termo | Tipo | Definição |
 |---|---|---|
 | Ordem de Serviço (OS) | EN (raiz) | Registro completo do atendimento de um veículo, do recebimento à entrega. |
-| Status da OS | VO | Estado atual da OS. Valores: Recebida, Em diagnóstico, Aguardando aprovação, Em execução, Finalizada, Entregue, Cancelada. |
+| Status da OS | VO | Estado atual da OS. Valores: Recebida, Em diagnóstico, Aguardando aprovação, Aguardando peça, Em execução, Finalizada, Entregue, Cancelada. |
+| Aguardando peça | VO (status) | Orçamento aprovado, mas a execução não começa porque uma ou mais peças foram encomendadas. A OS sai deste estado para Em execução quando todas as peças encomendadas chegam ao estoque. |
+| Encomenda | EN (Estoque) | Pedido de uma peça em falta ao fornecedor, ligado à OS que a aguarda. Situações: Pendente, Recebida, Cancelada. Ao dar entrada da peça no estoque, a encomenda é atendida (reservada) e a OS é avisada. |
 | Diagnóstico | EN | Avaliação técnica feita pelo mecânico; reúne os serviços e peças necessários. |
 | Serviço Orçado | EN (interna) | Linha de serviço de um orçamento (referencia o Catálogo de Serviços) com preço **congelado**. |
 | Peça Orçada | EN (interna) | Linha de peça de um orçamento (referencia o Estoque) com quantidade, situação e preço **congelado**. |
@@ -61,8 +63,10 @@ A OS carrega o ciclo de vida inteiro: abertura → diagnóstico → orçamento �
 **Políticas (gatilhos automáticos):**
 - Ao registrar peças → verificar estoque (chama o Estoque).
 - Ao concluir o diagnóstico → gerar orçamento.
-- Status muda sozinho conforme a ação: Em diagnóstico, Aguardando aprovação, Em execução, Finalizada, Entregue, Cancelada.
-- Ao aprovar o orçamento → reservar disponíveis e encomendar faltantes (chama o Estoque).
+- Status muda sozinho conforme a ação: Em diagnóstico, Aguardando aprovação, Aguardando peça, Em execução, Finalizada, Entregue, Cancelada.
+- Ao aprovar o orçamento → reservar disponíveis e encomendar faltantes (chama o Estoque). Se houver peça encomendada, a OS vai para Aguardando peça em vez de Em execução.
+- Ao dar entrada (ENTRADA) de uma peça no estoque → atende as encomendas pendentes daquela peça (FIFO) e avisa a OS; quando a última peça encomendada chega, a OS vai de Aguardando peça para Em execução.
+- OS cancelada → cancela as encomendas pendentes dela.
 - Cliente sem resposta (orçamento inicial ou adicional) → o Sistema reenvia a notificação periodicamente (**não** expira).
 - Conclusão da execução só vai para Finalizada se não houver orçamento (inicial ou adicional) pendente. Orçamento adicional recusado → o veículo é entregue sem aquele trabalho.
 - Pagamento recusado → reter o veículo até o pagamento.
