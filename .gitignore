@@ -36,3 +36,6 @@ prisma/*.db
 .claude/worktrees/
 .claude/settings.local.json
 CLAUDE.md
+
+# Documentação mantida apenas localmente (não versionar)
+docs/
