@@ -371,7 +371,9 @@ export class OrdemServico extends AgregadoRaiz<string> {
       this.props.status === StatusOS.AGUARDANDO_PECA &&
       !this.temPecaEncomendada()
     ) {
-      this.transicionarPara(StatusOS.EM_EXECUCAO, por);
+      // Retomada automática (a peça chegou): o ator é o próprio sistema, não
+      // um operador — registra "sistema" em vez de null no histórico.
+      this.transicionarPara(StatusOS.EM_EXECUCAO, por ?? 'sistema');
     }
   }
 

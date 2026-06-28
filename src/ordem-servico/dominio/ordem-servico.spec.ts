@@ -312,9 +312,13 @@ describe('Aguardando peça e recebimento', () => {
     );
     expect(os.puxarEventos()).toHaveLength(0); // nada de transição ainda
 
-    os.registrarRecebimentoDePeca('p2', 'estoque');
+    os.registrarRecebimentoDePeca('p2');
     expect(os.status).toBe(StatusOS.EM_EXECUCAO);
     expect(os.iniciadoExecucaoEm).toBeInstanceOf(Date);
+    // Retomada automática: o ator do histórico é "sistema", não null.
+    const ultimo = os.historico[os.historico.length - 1];
+    expect(ultimo.status).toBe(StatusOS.EM_EXECUCAO);
+    expect(ultimo.por).toBe('sistema');
     expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
       'ordem-servico.status-alterado',
     );
