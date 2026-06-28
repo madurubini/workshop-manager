@@ -1,4 +1,5 @@
 import {
+  ErroNaoEncontrado,
   ErroTransicaoInvalida,
   ErroValidacao,
 } from '../../compartilhado/erros/erros-dominio';
@@ -536,5 +537,64 @@ describe('Pagamento e entrega', () => {
     expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
       'ordem-servico.veiculo-entregue',
     );
+  });
+});
+
+describe('Guardas e getters do agregado', () => {
+  function osEmExec(): OrdemServico {
+    const os = abrirOS();
+    os.iniciarDiagnostico();
+    os.registrarDiagnostico({
+      servicos: [servico()],
+      pecas: [peca()],
+      orcamentoId: 'orc-1',
+    });
+    os.aprovarOrcamento('orc-1', 'cliente'); // peça disponível → Em execução
+    return os;
+  }
+
+  it('expõe os dados da OS pelos getters', () => {
+    const os = abrirOS();
+    expect(os.clienteId).toBe('c1');
+    expect(os.veiculoId).toBe('v1');
+    expect(os.problemaRelatado).toBe('Barulho na suspensão');
+    expect(os.criadoEm).toBeInstanceOf(Date);
+    expect(os.pagoEm).toBeNull();
+    expect(os.iniciadoExecucaoEm).toBeNull();
+    expect(os.finalizadoEm).toBeNull();
+  });
+
+  it('aprovar um orçamento inexistente lança ErroNaoEncontrado', () => {
+    const os = osEmExec();
+    expect(() => os.aprovarOrcamento('nao-existe')).toThrow(ErroNaoEncontrado);
+  });
+
+  it('recusar um orçamento inexistente lança ErroNaoEncontrado', () => {
+    const os = osEmExec();
+    expect(() => os.recusarOrcamento('nao-existe')).toThrow(ErroNaoEncontrado);
+  });
+
+  it('orçamento adicional fora da execução é rejeitado', () => {
+    const os = abrirOS(); // ainda em Recebida
+    expect(() =>
+      os.adicionarOrcamentoAdicional({
+        id: 'orc-2',
+        descricao: 'Correia',
+        servicos: [servico({ id: 'is2', servicoId: 's2' })],
+        pecas: [],
+      }),
+    ).toThrow(ErroTransicaoInvalida);
+  });
+
+  it('orçamento adicional sem serviço nem peça é rejeitado', () => {
+    const os = osEmExec();
+    expect(() =>
+      os.adicionarOrcamentoAdicional({
+        id: 'orc-2',
+        descricao: 'Vazio',
+        servicos: [],
+        pecas: [],
+      }),
+    ).toThrow(ErroValidacao);
   });
 });
