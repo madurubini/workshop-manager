@@ -7,7 +7,6 @@ services:
       POSTGRES_PASSWORD: oficina
       POSTGRES_DB: oficina
     ports:
-      # Host na 5433 para não conflitar com um Postgres já rodando na 5432.
       - '5433:5432'
     volumes:
       - oficina-pgdata:/var/lib/postgresql/data

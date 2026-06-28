@@ -5,7 +5,7 @@ cadastro de clientes/veículos, **Ordem de Serviço** (diagnóstico → orçamen
 entrega), controle de **estoque de peças** e acompanhamento do cliente por link público.
 
 **Stack:** TypeScript · NestJS 11 · PostgreSQL 16 + Prisma 5 · JWT · Swagger · Docker.
-Banco **PostgreSQL** (justificativa na ADR [`docs/adr/0001-escolha-do-banco-de-dados.md`](docs/adr/0001-escolha-do-banco-de-dados.md)).
+Banco **PostgreSQL** 
 
 ---
 
