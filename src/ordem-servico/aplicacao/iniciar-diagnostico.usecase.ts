@@ -11,12 +11,12 @@ import {
 } from '../dominio/repositorios';
 
 /**
- * Caso de uso: enviar o orçamento ao cliente. Leva a OS para "Aguardando
- * aprovação" e publica OrcamentoEnviado — que o módulo de notificações escuta
- * para avisar o cliente (efeito por evento, não rota).
+ * Caso de uso: iniciar o diagnóstico. Leva a OS de "Recebida" para "Em
+ * diagnóstico" — o mecânico assume a OS antes de registrar serviços e peças
+ * (que, ao serem registrados, concluem o diagnóstico e enviam o orçamento).
  */
 @Injectable()
-export class EnviarOrcamento {
+export class IniciarDiagnostico {
   constructor(
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
@@ -34,7 +34,7 @@ export class EnviarOrcamento {
         ordemId: entrada.ordemId,
       });
     }
-    ordem.enviarOrcamento(entrada.por);
+    ordem.iniciarDiagnostico(entrada.por);
     await this.ordens.atualizar(ordem);
     await this.eventos.publicar(...ordem.puxarEventos());
     return ordem;

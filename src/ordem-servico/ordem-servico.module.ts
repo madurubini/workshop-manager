@@ -10,7 +10,7 @@ import {
   ConfirmarPagamento,
   EntregarVeiculo,
 } from './aplicacao/entrega.usecases';
-import { EnviarOrcamento } from './aplicacao/enviar-orcamento.usecase';
+import { IniciarDiagnostico } from './aplicacao/iniciar-diagnostico.usecase';
 import { LancarOrcamentoAdicional } from './aplicacao/lancar-orcamento-adicional.usecase';
 import { MontadorDeItens } from './aplicacao/montador-de-itens.service';
 import { ORDEM_SERVICO_CONSULTA } from './aplicacao/ordem-servico-consulta.api';
@@ -47,8 +47,8 @@ import { RelatoriosController } from './interfaces/relatorios.controller';
   providers: [
     MontadorDeItens,
     AbrirOrdemServico,
+    IniciarDiagnostico,
     RegistrarDiagnostico,
-    EnviarOrcamento,
     AprovarOrcamento,
     RecusarOrcamento,
     ConcluirExecucao,

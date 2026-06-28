@@ -138,10 +138,20 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
 
   /**
-   * Registra o diagnóstico: cria o orçamento INICIAL (com as linhas já
-   * precificadas pela aplicação — preços congelados) e leva a OS de Recebida
-   * para Em diagnóstico. Se a OS não estiver em Recebida, a própria máquina de
-   * estados rejeita (HTTP 422).
+   * Inicia o diagnóstico: leva a OS de Recebida para Em diagnóstico, antes de
+   * registrar serviços e peças. É o mecânico assumindo a OS para diagnosticar.
+   * A máquina de estados rejeita (HTTP 422) se a OS não estiver em Recebida.
+   */
+  iniciarDiagnostico(por?: string | null): void {
+    this.transicionarPara(StatusOS.EM_DIAGNOSTICO, por);
+  }
+
+  /**
+   * Conclui o diagnóstico: cria o orçamento INICIAL (com as linhas já
+   * precificadas pela aplicação — preços congelados), já enviado ao cliente, e
+   * leva a OS de Em diagnóstico para Aguardando aprovação. Exige que o
+   * diagnóstico já tenha sido iniciado (OS em Em diagnóstico); caso contrário,
+   * rejeita (HTTP 422).
    */
   registrarDiagnostico(entrada: {
     servicos: ServicoOrcado[];
@@ -149,6 +159,11 @@ export class OrdemServico extends AgregadoRaiz<string> {
     orcamentoId: string;
     por?: string | null;
   }): void {
+    if (this.props.status !== StatusOS.EM_DIAGNOSTICO) {
+      throw new ErroTransicaoInvalida(
+        'O diagnóstico precisa ser iniciado antes de registrar serviços e peças.',
+      );
+    }
     if (entrada.servicos.length === 0 && entrada.pecas.length === 0) {
       throw new ErroValidacao(
         'O diagnóstico precisa de ao menos um serviço ou peça.',
@@ -158,8 +173,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
       throw new ErroValidacao('Esta OS já tem orçamento inicial.');
     }
 
-    this.transicionarPara(StatusOS.EM_DIAGNOSTICO, entrada.por);
-
+    const agora = new Date();
     const orcamento: Orcamento = {
       id: entrada.orcamentoId,
       tipo: TipoOrcamento.INICIAL,
@@ -167,15 +181,18 @@ export class OrdemServico extends AgregadoRaiz<string> {
       totalServicos: 0,
       totalPecas: 0,
       total: 0,
-      status: StatusOrcamento.GERADO,
-      criadoEm: new Date(),
-      enviadoEm: null,
+      status: StatusOrcamento.ENVIADO,
+      criadoEm: agora,
+      enviadoEm: agora,
       respondidoEm: null,
       servicos: entrada.servicos,
       pecas: entrada.pecas,
     };
     calcularTotais(orcamento);
     this.props.orcamentos.push(orcamento);
+
+    // Concluir o diagnóstico já envia o orçamento ao cliente.
+    this.transicionarPara(StatusOS.AGUARDANDO_APROVACAO, entrada.por);
 
     this.registrarEvento(new DiagnosticoConcluido(this.id));
     this.registrarEvento(
@@ -186,22 +203,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
         orcamento.total,
       ),
     );
-  }
-
-  /** Envia o orçamento INICIAL ao cliente: GERADO → ENVIADO; OS → Aguardando aprovação. */
-  enviarOrcamento(por?: string | null): void {
-    const orcamento = this.orcamentoInicial();
-    if (!orcamento) {
-      throw new ErroValidacao('Esta OS ainda não tem orçamento inicial.');
-    }
-    if (orcamento.status !== StatusOrcamento.GERADO) {
-      throw new ErroTransicaoInvalida(
-        `Orçamento precisa estar GERADO; está ${orcamento.status}.`,
-      );
-    }
-    orcamento.status = StatusOrcamento.ENVIADO;
-    orcamento.enviadoEm = new Date();
-    this.transicionarPara(StatusOS.AGUARDANDO_APROVACAO, por);
     this.registrarEvento(
       new OrcamentoEnviado(
         this.id,

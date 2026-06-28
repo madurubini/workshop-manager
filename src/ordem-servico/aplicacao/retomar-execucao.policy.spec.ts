@@ -14,6 +14,7 @@ function osAguardandoPeca(): OrdemServico {
     veiculoId: 'v1',
     problemaRelatado: 'Falha',
   });
+  os.iniciarDiagnostico();
   os.registrarDiagnostico({
     servicos: [],
     pecas: [
@@ -28,7 +29,6 @@ function osAguardandoPeca(): OrdemServico {
     ],
     orcamentoId: 'orc-1',
   });
-  os.enviarOrcamento();
   os.aprovarOrcamento('orc-1', 'cliente');
   os.puxarEventos();
   return os;

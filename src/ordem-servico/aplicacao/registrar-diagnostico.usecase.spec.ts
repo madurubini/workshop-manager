@@ -20,6 +20,12 @@ function osRecebida(): OrdemServico {
   });
 }
 
+function osEmDiagnostico(): OrdemServico {
+  const os = osRecebida();
+  os.iniciarDiagnostico();
+  return os;
+}
+
 describe('RegistrarDiagnostico', () => {
   let ordens: jest.Mocked<OrdemServicoRepository>;
   let montador: jest.Mocked<
@@ -66,8 +72,8 @@ describe('RegistrarDiagnostico', () => {
     );
   });
 
-  it('monta itens, gera orçamento e leva a OS para Em diagnóstico', async () => {
-    ordens.buscarPorId.mockResolvedValue(osRecebida());
+  it('monta itens, gera e envia o orçamento e leva a OS para Aguardando aprovação', async () => {
+    ordens.buscarPorId.mockResolvedValue(osEmDiagnostico());
 
     const ordem = await usecase.executar({
       ordemId: 'os-1',
@@ -75,9 +81,9 @@ describe('RegistrarDiagnostico', () => {
       pecas: [{ pecaId: 'p1', quantidade: 4 }],
     });
 
-    expect(ordem.status).toBe(StatusOS.EM_DIAGNOSTICO);
+    expect(ordem.status).toBe(StatusOS.AGUARDANDO_APROVACAO);
     expect(ordem.orcamento?.total).toBe(260); // 120 + 4*35
-    expect(ordem.orcamento?.status).toBe(StatusOrcamento.GERADO);
+    expect(ordem.orcamento?.status).toBe(StatusOrcamento.ENVIADO);
     expect(ordens.atualizar).toHaveBeenCalledWith(ordem);
     expect(eventos.publicar).toHaveBeenCalledTimes(1);
   });
@@ -89,10 +95,8 @@ describe('RegistrarDiagnostico', () => {
     ).rejects.toBeInstanceOf(ErroNaoEncontrado);
   });
 
-  it('propaga a guarda da máquina de estados (OS fora de Recebida)', async () => {
-    const os = osRecebida();
-    os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
-    ordens.buscarPorId.mockResolvedValue(os);
+  it('propaga a guarda da máquina de estados (diagnóstico não iniciado)', async () => {
+    ordens.buscarPorId.mockResolvedValue(osRecebida());
 
     await expect(
       usecase.executar({

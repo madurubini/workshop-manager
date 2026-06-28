@@ -14,6 +14,7 @@ function osEmExecucao(): OrdemServico {
     veiculoId: 'v1',
     problemaRelatado: 'x',
   });
+  os.iniciarDiagnostico();
   os.registrarDiagnostico({
     servicos: [
       {
@@ -27,7 +28,6 @@ function osEmExecucao(): OrdemServico {
     pecas: [],
     orcamentoId: 'orc-1',
   });
-  os.enviarOrcamento();
   os.aprovarOrcamento('orc-1', 'cliente');
   os.puxarEventos();
   return os;

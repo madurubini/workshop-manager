@@ -1,11 +1,9 @@
 import { PublicadorDeEventos } from '../../compartilhado/dominio/publicador-de-eventos';
-import { ErroNaoEncontrado } from '../../compartilhado/erros/erros-dominio';
 import { SituacaoPecaOrcada } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { StatusOS } from '../dominio/status-os';
 import { OrdemServicoRepository } from '../dominio/repositorios';
 import { AprovarOrcamento } from './aprovar-orcamento.usecase';
-import { EnviarOrcamento } from './enviar-orcamento.usecase';
 import { RecusarOrcamento } from './recusar-orcamento.usecase';
 
 function osComOrcamentoEnviado(): OrdemServico {
@@ -16,6 +14,7 @@ function osComOrcamentoEnviado(): OrdemServico {
     veiculoId: 'v1',
     problemaRelatado: 'x',
   });
+  os.iniciarDiagnostico();
   os.registrarDiagnostico({
     servicos: [
       {
@@ -38,7 +37,6 @@ function osComOrcamentoEnviado(): OrdemServico {
     ],
     orcamentoId: 'orc-1',
   });
-  os.enviarOrcamento();
   os.puxarEventos();
   return os;
 }
@@ -57,46 +55,6 @@ describe('Casos de uso de orçamento', () => {
       listarTemposExecucao: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
-  });
-
-  describe('EnviarOrcamento', () => {
-    it('envia, salva e publica OrcamentoEnviado', async () => {
-      const os = OrdemServico.abrir({
-        id: 'os-1',
-        numero: 'OS-1',
-        clienteId: 'c1',
-        veiculoId: 'v1',
-        problemaRelatado: 'x',
-      });
-      os.registrarDiagnostico({
-        servicos: [
-          {
-            id: 'is1',
-            servicoId: 's1',
-            descricao: 'S',
-            quantidade: 1,
-            precoAplicado: 100,
-          },
-        ],
-        pecas: [],
-        orcamentoId: 'orc-1',
-      });
-      os.puxarEventos();
-      ordens.buscarPorId.mockResolvedValue(os);
-
-      await new EnviarOrcamento(ordens, eventos).executar({ ordemId: 'os-1' });
-
-      expect(os.status).toBe(StatusOS.AGUARDANDO_APROVACAO);
-      expect(ordens.atualizar).toHaveBeenCalledWith(os);
-      expect(eventos.publicar).toHaveBeenCalled();
-    });
-
-    it('falha se a OS não existe', async () => {
-      ordens.buscarPorId.mockResolvedValue(null);
-      await expect(
-        new EnviarOrcamento(ordens, eventos).executar({ ordemId: 'x' }),
-      ).rejects.toBeInstanceOf(ErroNaoEncontrado);
-    });
   });
 
   describe('AprovarOrcamento', () => {

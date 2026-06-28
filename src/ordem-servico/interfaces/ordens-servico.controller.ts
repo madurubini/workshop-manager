@@ -27,7 +27,7 @@ import {
   ConfirmarPagamento,
   EntregarVeiculo,
 } from '../aplicacao/entrega.usecases';
-import { EnviarOrcamento } from '../aplicacao/enviar-orcamento.usecase';
+import { IniciarDiagnostico } from '../aplicacao/iniciar-diagnostico.usecase';
 import { LancarOrcamentoAdicional } from '../aplicacao/lancar-orcamento-adicional.usecase';
 import { RegistrarDiagnostico } from '../aplicacao/registrar-diagnostico.usecase';
 import {
@@ -51,8 +51,8 @@ import {
 export class OrdensServicoController {
   constructor(
     private readonly abrirOrdemServico: AbrirOrdemServico,
+    private readonly iniciarDiagnostico: IniciarDiagnostico,
     private readonly registrarDiagnostico: RegistrarDiagnostico,
-    private readonly enviarOrcamento: EnviarOrcamento,
     private readonly concluirExecucao: ConcluirExecucao,
     private readonly lancarOrcamentoAdicional: LancarOrcamentoAdicional,
     private readonly confirmarPagamento: ConfirmarPagamento,
@@ -97,11 +97,28 @@ export class OrdensServicoController {
     return OrdemServicoRespostaDto.de(ordem);
   }
 
+  @Post(':id/diagnostico/iniciar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Inicia o diagnóstico — o mecânico assume a OS antes de registrar itens (status → Em diagnóstico)',
+  })
+  async iniciar(
+    @Param('id') id: string,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ): Promise<OrdemServicoRespostaDto> {
+    const ordem = await this.iniciarDiagnostico.executar({
+      ordemId: id,
+      por: usuario.username,
+    });
+    return OrdemServicoRespostaDto.de(ordem);
+  }
+
   @Post(':id/diagnostico')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Registra serviços/peças e conclui o diagnóstico (verifica estoque, cota faltantes, gera orçamento; status → Em diagnóstico)',
+      'Registra serviços/peças e conclui o diagnóstico (verifica estoque, cota faltantes, gera e envia o orçamento; status → Aguardando aprovação)',
   })
   async diagnostico(
     @Param('id') id: string,
@@ -115,23 +132,6 @@ export class OrdensServicoController {
       por: usuario.username,
     });
     return DiagnosticoRespostaDto.de(ordem);
-  }
-
-  @Post(':id/orcamento/enviar')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary:
-      'Envia o orçamento ao cliente (status → Aguardando aprovação; notifica)',
-  })
-  async enviar(
-    @Param('id') id: string,
-    @UsuarioAtual() usuario: UsuarioAutenticado,
-  ): Promise<OrdemServicoRespostaDto> {
-    const ordem = await this.enviarOrcamento.executar({
-      ordemId: id,
-      por: usuario.username,
-    });
-    return OrdemServicoRespostaDto.de(ordem);
   }
 
   @Post(':id/execucao/concluir')

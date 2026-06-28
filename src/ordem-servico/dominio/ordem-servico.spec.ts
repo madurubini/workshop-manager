@@ -125,9 +125,21 @@ const peca = (over: Partial<PecaOrcada> = {}): PecaOrcada => ({
   ...over,
 });
 
-describe('OrdemServico.registrarDiagnostico', () => {
-  it('calcula os totais, gera orçamento inicial GERADO e vai para Em diagnóstico', () => {
+describe('OrdemServico.iniciarDiagnostico e registrarDiagnostico', () => {
+  it('iniciar leva de Recebida para Em diagnóstico', () => {
     const os = abrirOS();
+    os.puxarEventos();
+    os.iniciarDiagnostico('mecanico');
+
+    expect(os.status).toBe(StatusOS.EM_DIAGNOSTICO);
+    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
+      'ordem-servico.status-alterado',
+    );
+  });
+
+  it('registrar calcula os totais, gera o orçamento inicial ENVIADO e vai para Aguardando aprovação', () => {
+    const os = abrirOS();
+    os.iniciarDiagnostico();
     os.puxarEventos();
     os.registrarDiagnostico({
       servicos: [servico({ quantidade: 2, precoAplicado: 120 })],
@@ -135,21 +147,24 @@ describe('OrdemServico.registrarDiagnostico', () => {
       orcamentoId: 'orc-1',
     });
 
-    expect(os.status).toBe(StatusOS.EM_DIAGNOSTICO);
+    expect(os.status).toBe(StatusOS.AGUARDANDO_APROVACAO);
     expect(os.orcamento?.tipo).toBe(TipoOrcamento.INICIAL);
     expect(os.orcamento?.totalServicos).toBe(240); // 2 * 120
     expect(os.orcamento?.totalPecas).toBe(140); // 4 * 35
     expect(os.orcamento?.total).toBe(380);
-    expect(os.orcamento?.status).toBe(StatusOrcamento.GERADO);
+    expect(os.orcamento?.status).toBe(StatusOrcamento.ENVIADO);
+    expect(os.orcamento?.enviadoEm).toBeInstanceOf(Date);
 
     const nomes = os.puxarEventos().map((e) => e.nomeEvento);
     expect(nomes).toContain('ordem-servico.status-alterado');
     expect(nomes).toContain('ordem-servico.diagnostico-concluido');
     expect(nomes).toContain('ordem-servico.orcamento-gerado');
+    expect(nomes).toContain('ordem-servico.orcamento-enviado');
   });
 
   it('exige ao menos um serviço ou peça', () => {
     const os = abrirOS();
+    os.iniciarDiagnostico();
     expect(() =>
       os.registrarDiagnostico({
         servicos: [],
@@ -157,12 +172,11 @@ describe('OrdemServico.registrarDiagnostico', () => {
         orcamentoId: 'orc-1',
       }),
     ).toThrow(ErroValidacao);
-    expect(os.status).toBe(StatusOS.RECEBIDA);
+    expect(os.status).toBe(StatusOS.EM_DIAGNOSTICO);
   });
 
-  it('não registra diagnóstico se a OS não está em Recebida', () => {
+  it('não registra diagnóstico se ele não foi iniciado (OS em Recebida)', () => {
     const os = abrirOS();
-    os.transicionarPara(StatusOS.EM_DIAGNOSTICO);
     expect(() =>
       os.registrarDiagnostico({
         servicos: [servico()],
@@ -170,6 +184,7 @@ describe('OrdemServico.registrarDiagnostico', () => {
         orcamentoId: 'orc-1',
       }),
     ).toThrow(ErroTransicaoInvalida);
+    expect(os.status).toBe(StatusOS.RECEBIDA);
   });
 });
 
@@ -184,8 +199,11 @@ describe('Ciclo de vida do orçamento inicial', () => {
     situacao: SituacaoPecaOrcada.EM_COTACAO,
   });
 
+  // Registrar o diagnóstico já deixa o orçamento ENVIADO e a OS em Aguardando
+  // aprovação (o envio passou a fazer parte da conclusão do diagnóstico).
   function osComOrcamento(): OrdemServico {
     const os = abrirOS();
+    os.iniciarDiagnostico();
     os.registrarDiagnostico({
       servicos: [servico()],
       pecas: [pecaDisponivel, pecaCotada],
@@ -195,27 +213,15 @@ describe('Ciclo de vida do orçamento inicial', () => {
     return os;
   }
 
-  it('enviar: GERADO → ENVIADO e OS → Aguardando aprovação', () => {
+  it('o orçamento já nasce ENVIADO e a OS em Aguardando aprovação', () => {
     const os = osComOrcamento();
-    os.enviarOrcamento('recepcionista');
     expect(os.status).toBe(StatusOS.AGUARDANDO_APROVACAO);
     expect(os.orcamento?.status).toBe(StatusOrcamento.ENVIADO);
     expect(os.orcamento?.enviadoEm).toBeInstanceOf(Date);
-    expect(os.puxarEventos().map((e) => e.nomeEvento)).toContain(
-      'ordem-servico.orcamento-enviado',
-    );
-  });
-
-  it('não envia se o orçamento não está GERADO', () => {
-    const os = osComOrcamento();
-    os.enviarOrcamento();
-    expect(() => os.enviarOrcamento()).toThrow(ErroTransicaoInvalida);
   });
 
   it('aprovar com peça em cotação: APROVADO, OS → Aguardando peça, peças reservada/encomendada', () => {
     const os = osComOrcamento();
-    os.enviarOrcamento();
-    os.puxarEventos();
 
     os.aprovarOrcamento('orc-1', 'cliente');
 
@@ -244,8 +250,6 @@ describe('Ciclo de vida do orçamento inicial', () => {
 
   it('recusar: ENVIADO → RECUSADO e OS → Cancelada', () => {
     const os = osComOrcamento();
-    os.enviarOrcamento();
-    os.puxarEventos();
 
     os.recusarOrcamento('orc-1', 'Muito caro', 'cliente');
 
@@ -256,8 +260,9 @@ describe('Ciclo de vida do orçamento inicial', () => {
     expect(nomes).toContain('ordem-servico.os-cancelada');
   });
 
-  it('não aprova um orçamento que não foi enviado', () => {
-    const os = osComOrcamento(); // orçamento GERADO, não ENVIADO
+  it('não aprova duas vezes o mesmo orçamento', () => {
+    const os = osComOrcamento();
+    os.aprovarOrcamento('orc-1', 'cliente');
     expect(() => os.aprovarOrcamento('orc-1')).toThrow(ErroTransicaoInvalida);
   });
 });
@@ -265,12 +270,12 @@ describe('Ciclo de vida do orçamento inicial', () => {
 describe('Aguardando peça e recebimento', () => {
   function osComPecas(pecas: PecaOrcada[]): OrdemServico {
     const os = abrirOS();
+    os.iniciarDiagnostico();
     os.registrarDiagnostico({
       servicos: [servico()],
       pecas,
       orcamentoId: 'orc-1',
     });
-    os.enviarOrcamento();
     os.puxarEventos();
     return os;
   }
@@ -339,12 +344,12 @@ describe('Aguardando peça e recebimento', () => {
 describe('Execução e orçamento adicional', () => {
   function osEmExecucao(): OrdemServico {
     const os = abrirOS();
+    os.iniciarDiagnostico();
     os.registrarDiagnostico({
       servicos: [servico()],
       pecas: [peca()],
       orcamentoId: 'orc-1',
     });
-    os.enviarOrcamento();
     os.aprovarOrcamento('orc-1', 'cliente');
     os.puxarEventos();
     return os;
@@ -466,12 +471,12 @@ describe('Execução e orçamento adicional', () => {
 describe('Pagamento e entrega', () => {
   function osFinalizada(): OrdemServico {
     const os = abrirOS();
+    os.iniciarDiagnostico();
     os.registrarDiagnostico({
       servicos: [servico()],
       pecas: [],
       orcamentoId: 'orc-1',
     });
-    os.enviarOrcamento();
     os.aprovarOrcamento('orc-1', 'cliente');
     os.concluirExecucao('mecanico');
     os.puxarEventos();
@@ -507,12 +512,12 @@ describe('Pagamento e entrega', () => {
 
   it('entrega de OS cancelada falha por transição inválida (não por pagamento)', () => {
     const os = abrirOS();
+    os.iniciarDiagnostico();
     os.registrarDiagnostico({
       servicos: [servico()],
       pecas: [],
       orcamentoId: 'orc-1',
     });
-    os.enviarOrcamento();
     os.recusarOrcamento('orc-1', 'caro', 'cliente');
     expect(os.status).toBe(StatusOS.CANCELADA);
     expect(() => os.entregar('recepcionista')).toThrow(ErroTransicaoInvalida);
