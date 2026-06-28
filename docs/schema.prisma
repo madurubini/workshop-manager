@@ -1,0 +1,249 @@
+// schema.prisma — Sistema de Oficina (MVP, Fase 1)
+// Postgres. Reflete os 3 agregados: Clientes e Veículos, Ordem de Serviço (com Orçamentos), Estoque.
+// Decisões aplicadas: preço congelado nos itens orçados, histórico de status, versão (optimistic lock),
+// soft delete nos cadastros, reserva como registro explícito, dinheiro em Decimal.
+// Uma OS pode ter VÁRIOS orçamentos: 1 INICIAL (do diagnóstico) + N ADICIONAL (reparos
+// descobertos durante a execução). Cada orçamento é aprovado/recusado de forma independente.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Identidade e Acesso ───────────────────────────
+
+model Usuario {
+  id        String   @id @default(uuid()) @db.Uuid
+  username  String   @unique
+  senhaHash String
+  papel     String // RECEPCIONISTA | MECANICO | GESTOR
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  @@map("usuario")
+}
+
+// ─────────────────────────── Clientes e Veículos ───────────────────────────
+
+model Cliente {
+  id            String   @id @default(uuid()) @db.Uuid
+  tipoDocumento String // CPF | CNPJ
+  documento     String   @unique // validado na aplicação
+  nome          String
+  email         String?
+  telefone      String?
+  ativo         Boolean  @default(true) // soft delete
+  criadoEm      DateTime @default(now())
+
+  veiculos       Veiculo[]
+  ordensServico  OrdemServico[]
+
+  @@map("cliente")
+}
+
+model Veiculo {
+  id        String   @id @default(uuid()) @db.Uuid
+  clienteId String   @db.Uuid
+  placa     String   @unique // validada na aplicação
+  marca     String
+  modelo    String
+  ano       Int
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  cliente       Cliente        @relation(fields: [clienteId], references: [id])
+  ordensServico OrdemServico[]
+
+  @@index([clienteId])
+  @@map("veiculo")
+}
+
+// ─────────────────────────── Catálogo de Serviços ──────────────────────────
+
+model Servico {
+  id        String   @id @default(uuid()) @db.Uuid
+  nome      String
+  descricao String?
+  precoBase Decimal  @db.Decimal(10, 2)
+  ativo     Boolean  @default(true)
+
+  orcados ServicoOrcado[]
+
+  @@map("servico")
+}
+
+// ─────────────────────────── Estoque (raiz Peça) ───────────────────────────
+
+model Peca {
+  id            String   @id @default(uuid()) @db.Uuid
+  codigo        String   @unique
+  nome          String
+  precoUnitario Decimal  @db.Decimal(10, 2)
+  saldoFisico   Int      @default(0)
+  reservado     Int      @default(0) // disponivel = saldoFisico - reservado
+  ativo         Boolean  @default(true)
+  // disponivel é derivado; pode virar uma coluna gerada no Postgres se preferir
+
+  orcados    PecaOrcada[]
+  reservas   ReservaEstoque[]
+  cotacoes   Cotacao[]
+  encomendas Encomenda[]
+
+  @@map("peca")
+}
+
+model ReservaEstoque {
+  id          String   @id @default(uuid()) @db.Uuid
+  pecaId      String   @db.Uuid
+  ordemId     String   @db.Uuid
+  quantidade  Int
+  status      String // RESERVADA | BAIXADA | LIBERADA
+  criadoEm    DateTime @default(now())
+
+  peca  Peca         @relation(fields: [pecaId], references: [id])
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@index([ordemId])
+  @@index([pecaId])
+  @@map("reserva_estoque")
+}
+
+model Cotacao {
+  id          String   @id @default(uuid()) @db.Uuid
+  pecaId      String   @db.Uuid
+  ordemId     String   @db.Uuid
+  preco       Decimal  @db.Decimal(10, 2)
+  prazoDias   Int
+  fornecedor  String?
+  recebidaEm  DateTime @default(now())
+
+  peca  Peca         @relation(fields: [pecaId], references: [id])
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@map("cotacao")
+}
+
+// Encomenda de peça em falta, criada ao aprovar um orçamento com peça EM_COTACAO.
+// Liga peça ↔ OS para que, na ENTRADA da peça no estoque, saibamos qual OS aguardava.
+// Atendida (RESERVADA) quando há saldo; PENDENTE até chegar; CANCELADA se a OS cair.
+model Encomenda {
+  id         String    @id @default(uuid()) @db.Uuid
+  pecaId     String    @db.Uuid
+  ordemId    String    @db.Uuid
+  quantidade Int
+  status     String    @default("PENDENTE") // PENDENTE | RECEBIDA | CANCELADA
+  criadoEm   DateTime  @default(now())
+  recebidaEm DateTime?
+
+  peca  Peca         @relation(fields: [pecaId], references: [id])
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@index([pecaId, status])
+  @@index([ordemId])
+  @@map("encomenda")
+}
+
+// ─────────────────────────── Ordem de Serviço ──────────────────────────────
+
+model OrdemServico {
+  id              String    @id @default(uuid()) @db.Uuid
+  numero          String    @unique
+  clienteId       String    @db.Uuid
+  veiculoId       String    @db.Uuid
+  problemaRelatado String
+  status          String    @default("RECEBIDA") // máquina de estados (ver enum lógico)
+  versao          Int       @default(0) // optimistic lock
+  criadoEm        DateTime  @default(now())
+  iniciadoExecucaoEm DateTime?
+  finalizadoEm    DateTime?
+  pago            Boolean   @default(false) // pagamento manual: flag de "pode entregar"
+  pagoEm          DateTime?
+
+  cliente    Cliente         @relation(fields: [clienteId], references: [id])
+  veiculo    Veiculo         @relation(fields: [veiculoId], references: [id])
+  orcamentos Orcamento[]
+  historico  HistoricoStatus[]
+  reservas   ReservaEstoque[]
+  cotacoes   Cotacao[]
+  encomendas Encomenda[]
+
+  @@index([clienteId])
+  @@index([veiculoId])
+  @@index([status])
+  @@map("ordem_servico")
+}
+
+// Orçamento da OS. Pode haver vários: 1 INICIAL (diagnóstico) + N ADICIONAL (reparos).
+// Aprovar/recusar o INICIAL move o status da OS; os ADICIONAL não mudam o status,
+// apenas liberam (ou não) a execução do trabalho extra.
+model Orcamento {
+  id            String    @id @default(uuid()) @db.Uuid
+  ordemId       String    @db.Uuid
+  tipo          String    @default("INICIAL") // INICIAL | ADICIONAL
+  descricao     String? // motivo do orçamento adicional (null no inicial)
+  totalServicos Decimal   @db.Decimal(10, 2)
+  totalPecas    Decimal   @db.Decimal(10, 2)
+  total         Decimal   @db.Decimal(10, 2)
+  status        String    @default("GERADO") // GERADO | ENVIADO | APROVADO | RECUSADO
+  criadoEm      DateTime  @default(now())
+  enviadoEm     DateTime?
+  respondidoEm  DateTime?
+
+  ordem    OrdemServico    @relation(fields: [ordemId], references: [id])
+  servicos ServicoOrcado[]
+  pecas    PecaOrcada[]
+
+  @@index([ordemId])
+  @@map("orcamento")
+}
+
+// Linha de serviço do orçamento, com PREÇO CONGELADO no momento da geração.
+model ServicoOrcado {
+  id            String  @id @default(uuid()) @db.Uuid
+  orcamentoId   String  @db.Uuid
+  servicoId     String  @db.Uuid
+  descricao     String // snapshot do nome
+  quantidade    Int     @default(1)
+  precoAplicado Decimal @db.Decimal(10, 2) // congelado
+
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id])
+  servico   Servico   @relation(fields: [servicoId], references: [id])
+
+  @@index([orcamentoId])
+  @@map("servico_orcado")
+}
+
+// Linha de peça do orçamento, com preço congelado e situação no estoque.
+model PecaOrcada {
+  id            String  @id @default(uuid()) @db.Uuid
+  orcamentoId   String  @db.Uuid
+  pecaId        String  @db.Uuid
+  descricao     String
+  quantidade    Int
+  precoAplicado Decimal @db.Decimal(10, 2) // congelado
+  situacao      String  @default("PENDENTE") // PENDENTE | DISPONIVEL | EM_COTACAO | ENCOMENDADA | RESERVADA
+
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id])
+  peca      Peca      @relation(fields: [pecaId], references: [id])
+
+  @@index([orcamentoId])
+  @@map("peca_orcada")
+}
+
+// Foto de cada transição de status — atende o acompanhamento e a auditoria.
+model HistoricoStatus {
+  id       String   @id @default(uuid()) @db.Uuid
+  ordemId  String   @db.Uuid
+  status   String
+  em       DateTime @default(now())
+  por      String? // ator/usuário que disparou
+
+  ordem OrdemServico @relation(fields: [ordemId], references: [id])
+
+  @@index([ordemId])
+  @@map("historico_status")
+}
