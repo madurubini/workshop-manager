@@ -5,7 +5,25 @@ cadastro de clientes/veículos, **Ordem de Serviço** (diagnóstico → orçamen
 entrega), controle de **estoque de peças** e acompanhamento do cliente por link público.
 
 **Stack:** TypeScript · NestJS 11 · PostgreSQL 16 + Prisma 5 · JWT · Swagger · Docker.
-Banco **PostgreSQL** 
+
+---
+
+## Objetivos
+
+Digitalizar o atendimento de uma oficina mecânica, do recebimento do veículo à entrega,
+concentrando as regras de negócio no agregado **Ordem de Serviço**:
+
+- **Cadastros:** clientes, veículos, serviços e peças (com saldo de estoque).
+- **Ordem de Serviço ponta a ponta:** recebimento → diagnóstico → orçamento → aprovação do
+  cliente → execução → finalização → pagamento → entrega, com uma **máquina de estados** que
+  rejeita transições inválidas (HTTP 422).
+- **Orçamento com preço congelado** (snapshot no diagnóstico) e **vários orçamentos por OS**: um
+  inicial e adicionais para reparos descobertos durante a execução.
+- **Estoque e cotação:** peça disponível é reservada na aprovação; peça em falta é **encomendada**,
+  a OS fica em *Aguardando peça* e **retoma a execução automaticamente** quando a peça dá entrada.
+- **Acompanhamento do cliente** por link público (token da OS): consultar o status e aprovar/recusar
+  orçamentos sem login de operador.
+- **Notificações** ao cliente disparadas por evento (ex.: orçamento enviado).
 
 ---
 
@@ -69,7 +87,7 @@ Base `/api/v1`. A referência completa (schemas e exemplos) está no **Swagger**
 - **CRUD (JWT):** `/clientes`, `/clientes/{id}/veiculos`, `/veiculos/{id}`, `/servicos`, `/pecas`,
   `PATCH /pecas/{id}/estoque`
 - **Ordem de Serviço (JWT):** `POST /ordens-servico`, `GET /ordens-servico[/{id}]`,
-  `POST .../diagnostico`, `POST .../orcamento/enviar`, `POST .../execucao/concluir`,
+  `POST .../diagnostico/iniciar`, `POST .../diagnostico`, `POST .../execucao/concluir`,
   `POST .../orcamentos-adicionais`, `POST .../pagamento`, `POST .../entrega`,
   `GET /relatorios/tempo-medio-execucao`
 - **Acompanhamento (público, token da OS):** `GET /acompanhamento/{osId}`,
@@ -86,10 +104,38 @@ Status: 400 (validação), 401/403 (auth), 404, 409 (conflito), 422 (transição
 
 ---
 
+## Fluxo de uso (jornada da OS)
+
+Sequência típica via API. As rotas administrativas exigem `Authorization: Bearer <accessToken>`;
+as de `/acompanhamento` usam o **token da OS** (devolvido na notificação ao cliente).
+
+1. **Abrir a OS** — `POST /ordens-servico` `{ clienteId, veiculoId, problemaRelatado }` → *Recebida*.
+2. **Iniciar o diagnóstico** — `POST /ordens-servico/{id}/diagnostico/iniciar` → *Em diagnóstico*
+   (o mecânico assume a OS antes de lançar itens).
+3. **Concluir o diagnóstico** — `POST /ordens-servico/{id}/diagnostico` `{ servicos, pecas }`:
+   gera o orçamento, verifica o estoque (cota as peças em falta), **envia ao cliente** e notifica →
+   *Aguardando aprovação*.
+4. **Cliente responde** — `POST /acompanhamento/{osId}/orcamentos/{orcamentoId}/resposta`
+   `{ aprovado }`. Aprovado → *Em execução* (ou *Aguardando peça*, se algo foi encomendado);
+   recusado → *Cancelada*.
+5. **Peça encomendada chega** — `PATCH /pecas/{id}/estoque` `{ tipo: "ENTRADA", quantidade }`:
+   a OS sai de *Aguardando peça* e **retoma para *Em execução* automaticamente** (registrada como
+   ação do "sistema" no histórico).
+6. **Concluir a execução** — `POST /ordens-servico/{id}/execucao/concluir` → *Finalizada*
+   (bloqueia se houver orçamento pendente ou peça por chegar).
+7. **Pagamento e entrega** — `POST /ordens-servico/{id}/pagamento` `{ pago: true }`, depois
+   `POST /ordens-servico/{id}/entrega` → *Entregue* (a entrega exige pagamento confirmado).
+
+> Reparos descobertos durante a execução viram **orçamento adicional**
+> (`POST /ordens-servico/{id}/orcamentos-adicionais`), aprovado pelo cliente no mesmo endpoint de
+> acompanhamento; a OS só finaliza quando nenhum orçamento está pendente.
+
+---
+
 ## Testes
 
 ```bash
-npm test          # unitários (domínio + aplicação) — 189 testes
+npm test          # unitários (domínio + aplicação)
 npm run test:cov  # com cobertura (threshold GLOBAL de 80%)
 npm run test:e2e  # end-to-end (auth, health e fluxo completo da OS via HTTP)
 ```
