@@ -36,7 +36,7 @@ concentrando as regras de negócio no agregado **Ordem de Serviço**:
 
 ## Como executar
 
-### Opção 1 — Docker (app + Postgres com um comando)
+### Docker (app + Postgres com um comando)
 
 ```bash
 docker compose up --build
@@ -49,13 +49,10 @@ started`, está pronto:
 - **API:** http://localhost:3000/api/v1
 - **Swagger:** http://localhost:3000/api/docs
 - **Health check:** http://localhost:3000/api/v1/health → `{"status":"ok"}`
-- **Postgres** exposto no host em **5433** (para não colidir com um Postgres já na 5432).
+- **Postgres** exposto no host em **5433**
 
 Em segundo plano: `docker compose up --build -d`. Para encerrar: `docker compose down`
 (ou `down -v` para apagar também o volume do banco).
-
-> Migrando de uma versão que usava `prisma db push`? Rode `docker compose down -v` uma vez para
-> recriar o volume do banco limpo (o `migrate deploy` espera aplicar do zero).
 
 
 ## Autenticação
