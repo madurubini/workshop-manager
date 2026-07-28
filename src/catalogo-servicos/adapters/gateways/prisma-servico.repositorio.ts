@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Servico as ServicoPrisma } from '@prisma/client';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
-import { Servico } from '../dominio/servico';
-import { ServicoRepository } from '../dominio/repositorio';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
+import { Servico } from '../../entities/servico';
+import { ServicoRepository } from '../../use-cases/servico.repositorio';
 
+/**
+ * Gateway (Adaptador de Interface) do agregado Servico: implementa a porta
+ * `ServicoRepository` traduzindo entre o Prisma e a entidade. O Prisma Client
+ * em si é o Framework & Driver (detalhe); aqui só adaptamos os dados.
+ */
 @Injectable()
 export class PrismaServicoRepository implements ServicoRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -33,8 +38,8 @@ export class PrismaServicoRepository implements ServicoRepository {
   }
 
   async buscarPorId(id: string): Promise<Servico | null> {
-    const r = await this.prisma.servico.findUnique({ where: { id } });
-    return r ? this.mapear(r) : null;
+    const registro = await this.prisma.servico.findUnique({ where: { id } });
+    return registro ? this.mapear(registro) : null;
   }
 
   async listar(): Promise<Servico[]> {
@@ -42,15 +47,15 @@ export class PrismaServicoRepository implements ServicoRepository {
       where: { ativo: true },
       orderBy: { nome: 'asc' },
     });
-    return registros.map((r) => this.mapear(r));
+    return registros.map((registro) => this.mapear(registro));
   }
 
-  private mapear(r: ServicoPrisma): Servico {
-    return Servico.restaurar(r.id, {
-      nome: r.nome,
-      descricao: r.descricao,
-      precoBase: Number(r.precoBase),
-      ativo: r.ativo,
+  private mapear(registro: ServicoPrisma): Servico {
+    return Servico.restaurar(registro.id, {
+      nome: registro.nome,
+      descricao: registro.descricao,
+      precoBase: Number(registro.precoBase),
+      ativo: registro.ativo,
     });
   }
 }

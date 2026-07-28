@@ -5,60 +5,44 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
-  NotFoundException,
   Param,
   Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
-import {
-  AtualizarServico,
-  CadastrarServico,
-  RemoverServico,
-} from '../aplicacao/servico-crud.usecases';
-import { SERVICO_REPOSITORY, ServicoRepository } from '../dominio/repositorio';
+import { JwtAuthGuard } from '../../../identidade/interfaces/jwt-auth.guard';
+import { ServicoUseCases } from '../../use-cases/servico.usecases';
+import { apresentarServico } from '../presenters/servico.presenter';
 import {
   AtualizarServicoDto,
   CriarServicoDto,
   ServicoRespostaDto,
-} from './dtos';
+} from '../dtos';
 
 @ApiTags('Serviços (catálogo)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('servicos')
 export class ServicosController {
-  constructor(
-    private readonly cadastrar: CadastrarServico,
-    private readonly atualizar: AtualizarServico,
-    private readonly remover: RemoverServico,
-    @Inject(SERVICO_REPOSITORY)
-    private readonly servicos: ServicoRepository,
-  ) {}
+  constructor(private readonly servicos: ServicoUseCases) {}
 
   @Post()
   @ApiOperation({ summary: 'Cadastra um serviço' })
   async criar(@Body() dto: CriarServicoDto): Promise<ServicoRespostaDto> {
-    return ServicoRespostaDto.de(await this.cadastrar.executar(dto));
+    return apresentarServico(await this.servicos.cadastrar(dto));
   }
 
   @Get()
   @ApiOperation({ summary: 'Lista os serviços ativos' })
   async listar(): Promise<ServicoRespostaDto[]> {
-    return (await this.servicos.listar()).map(ServicoRespostaDto.de);
+    return (await this.servicos.listar()).map(apresentarServico);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detalha um serviço' })
   async porId(@Param('id') id: string): Promise<ServicoRespostaDto> {
-    const servico = await this.servicos.buscarPorId(id);
-    if (!servico) {
-      throw new NotFoundException('Serviço não encontrado.');
-    }
-    return ServicoRespostaDto.de(servico);
+    return apresentarServico(await this.servicos.buscar(id));
   }
 
   @Put(':id')
@@ -67,13 +51,13 @@ export class ServicosController {
     @Param('id') id: string,
     @Body() dto: AtualizarServicoDto,
   ): Promise<ServicoRespostaDto> {
-    return ServicoRespostaDto.de(await this.atualizar.executar({ id, ...dto }));
+    return apresentarServico(await this.servicos.atualizar({ id, ...dto }));
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove um serviço (soft delete)' })
   async excluir(@Param('id') id: string): Promise<void> {
-    await this.remover.executar({ id });
+    await this.servicos.remover(id);
   }
 }

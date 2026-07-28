@@ -10,7 +10,7 @@ import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
 } from '../dominio/repositorios';
-import { MontadorDeItens } from './montador-de-itens.service';
+import { OrcadorDeItens } from './orcador-de-itens.service';
 
 export interface EntradaRegistrarDiagnostico {
   ordemId: string;
@@ -21,7 +21,7 @@ export interface EntradaRegistrarDiagnostico {
 
 /**
  * Caso de uso central da Fatia 2. Monta os itens (preços congelados, estoque
- * verificado só em leitura, faltantes cotados) via MontadorDeItens e delega à
+ * verificado só em leitura, faltantes cotados) via OrcadorDeItens e delega à
  * OS o registro do diagnóstico — que gera o orçamento e leva a OS de Recebida
  * → Em diagnóstico.
  */
@@ -30,7 +30,7 @@ export class RegistrarDiagnostico {
   constructor(
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
-    private readonly montador: MontadorDeItens,
+    private readonly orcador: OrcadorDeItens,
     @Inject(PUBLICADOR_DE_EVENTOS)
     private readonly eventos: PublicadorDeEventos,
   ) {}
@@ -43,11 +43,8 @@ export class RegistrarDiagnostico {
       });
     }
 
-    const servicos = await this.montador.montarServicos(entrada.servicos);
-    const pecas = await this.montador.montarPecas(
-      entrada.ordemId,
-      entrada.pecas,
-    );
+    const servicos = await this.orcador.orcarServicos(entrada.servicos);
+    const pecas = await this.orcador.orcarPecas(entrada.ordemId, entrada.pecas);
 
     ordem.registrarDiagnostico({
       servicos,

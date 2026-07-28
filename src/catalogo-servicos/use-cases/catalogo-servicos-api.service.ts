@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CatalogoServicosApi, ServicoCatalogo } from './catalogo-servicos.api';
-import { SERVICO_REPOSITORY, ServicoRepository } from '../dominio/repositorio';
+import { SERVICO_REPOSITORY, ServicoRepository } from './servico.repositorio';
 
 @Injectable()
 export class CatalogoServicosApiService implements CatalogoServicosApi {

@@ -10,11 +10,11 @@ import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
 } from '../dominio/repositorios';
-import { MontadorDeItens } from './montador-de-itens.service';
+import { OrcadorDeItens } from './orcador-de-itens.service';
 
 /**
  * Caso de uso: lançar um orçamento ADICIONAL durante a execução (o antigo
- * "reparo adicional"). Reaproveita o MontadorDeItens (mesmo congelamento de
+ * "reparo adicional"). Reaproveita o OrcadorDeItens (mesmo congelamento de
  * preço e verificação de estoque do diagnóstico). A OS cria o novo orçamento já
  * enviado e emite o evento que pede autorização ao cliente.
  */
@@ -23,7 +23,7 @@ export class LancarOrcamentoAdicional {
   constructor(
     @Inject(ORDEM_SERVICO_REPOSITORY)
     private readonly ordens: OrdemServicoRepository,
-    private readonly montador: MontadorDeItens,
+    private readonly orcador: OrcadorDeItens,
     @Inject(PUBLICADOR_DE_EVENTOS)
     private readonly eventos: PublicadorDeEventos,
   ) {}
@@ -41,11 +41,8 @@ export class LancarOrcamentoAdicional {
       });
     }
 
-    const servicos = await this.montador.montarServicos(entrada.servicos);
-    const pecas = await this.montador.montarPecas(
-      entrada.ordemId,
-      entrada.pecas,
-    );
+    const servicos = await this.orcador.orcarServicos(entrada.servicos);
+    const pecas = await this.orcador.orcarPecas(entrada.ordemId, entrada.pecas);
 
     ordem.adicionarOrcamentoAdicional({
       id: randomUUID(),

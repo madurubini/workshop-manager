@@ -12,7 +12,7 @@ import {
 } from './aplicacao/entrega.usecases';
 import { IniciarDiagnostico } from './aplicacao/iniciar-diagnostico.usecase';
 import { LancarOrcamentoAdicional } from './aplicacao/lancar-orcamento-adicional.usecase';
-import { MontadorDeItens } from './aplicacao/montador-de-itens.service';
+import { OrcadorDeItens } from './aplicacao/orcador-de-itens.service';
 import { ORDEM_SERVICO_CONSULTA } from './aplicacao/ordem-servico-consulta.api';
 import { OrdemServicoConsultaService } from './aplicacao/ordem-servico-consulta.service';
 import { RecusarOrcamento } from './aplicacao/recusar-orcamento.usecase';
@@ -45,7 +45,7 @@ import { RelatoriosController } from './interfaces/relatorios.controller';
     RelatoriosController,
   ],
   providers: [
-    MontadorDeItens,
+    OrcadorDeItens,
     AbrirOrdemServico,
     IniciarDiagnostico,
     RegistrarDiagnostico,

@@ -6,7 +6,6 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { Servico } from '../dominio/servico';
 
 export class CriarServicoDto {
   @ApiProperty({ example: 'Troca de óleo' })
@@ -50,14 +49,4 @@ export class ServicoRespostaDto {
   @ApiPropertyOptional() descricao!: string | null;
   @ApiProperty() precoBase!: number;
   @ApiProperty() ativo!: boolean;
-
-  static de(servico: Servico): ServicoRespostaDto {
-    return {
-      id: servico.id,
-      nome: servico.nome,
-      descricao: servico.descricao,
-      precoBase: servico.precoBase,
-      ativo: servico.ativo,
-    };
-  }
 }

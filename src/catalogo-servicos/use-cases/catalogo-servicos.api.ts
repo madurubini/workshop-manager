@@ -1,5 +1,5 @@
 /**
- * Porta pública do Catálogo de Serviços (open-host service). O contexto
+ * Contrato público (open-host service) do Catálogo de Serviços. O contexto
  * Ordem de Serviço consulta o preço base por aqui — e o congela no orçamento.
  * Não expõe a entidade Servico inteira, só o necessário.
  */

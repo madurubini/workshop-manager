@@ -4,7 +4,7 @@ import { OrdemServico } from '../dominio/ordem-servico';
 import { SituacaoPecaOrcada, TipoOrcamento } from '../dominio/itens';
 import { OrdemServicoRepository } from '../dominio/repositorios';
 import { LancarOrcamentoAdicional } from './lancar-orcamento-adicional.usecase';
-import { MontadorDeItens } from './montador-de-itens.service';
+import { OrcadorDeItens } from './orcador-de-itens.service';
 
 function osEmExecucao(): OrdemServico {
   const os = OrdemServico.abrir({
@@ -36,8 +36,8 @@ function osEmExecucao(): OrdemServico {
 describe('LancarOrcamentoAdicional', () => {
   let ordens: jest.Mocked<OrdemServicoRepository>;
   let eventos: jest.Mocked<PublicadorDeEventos>;
-  let montador: jest.Mocked<
-    Pick<MontadorDeItens, 'montarServicos' | 'montarPecas'>
+  let orcador: jest.Mocked<
+    Pick<OrcadorDeItens, 'orcarServicos' | 'orcarPecas'>
   >;
   let usecase: LancarOrcamentoAdicional;
 
@@ -51,8 +51,8 @@ describe('LancarOrcamentoAdicional', () => {
       listarTemposExecucao: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
-    montador = {
-      montarServicos: jest.fn().mockResolvedValue([
+    orcador = {
+      orcarServicos: jest.fn().mockResolvedValue([
         {
           id: 'is2',
           servicoId: 's2',
@@ -61,11 +61,11 @@ describe('LancarOrcamentoAdicional', () => {
           precoAplicado: 80,
         },
       ]),
-      montarPecas: jest.fn().mockResolvedValue([]),
+      orcarPecas: jest.fn().mockResolvedValue([]),
     };
     usecase = new LancarOrcamentoAdicional(
       ordens,
-      montador as unknown as MontadorDeItens,
+      orcador as unknown as OrcadorDeItens,
       eventos,
     );
   });
@@ -101,7 +101,7 @@ describe('LancarOrcamentoAdicional', () => {
   });
 
   it('respeita a situação das peças montadas (DISPONIVEL)', async () => {
-    montador.montarPecas.mockResolvedValue([
+    orcador.orcarPecas.mockResolvedValue([
       {
         id: 'ip2',
         pecaId: 'p2',

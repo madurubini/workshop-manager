@@ -1,14 +1,10 @@
 import { Module } from '@nestjs/common';
-import { CATALOGO_SERVICOS_API } from './aplicacao/catalogo-servicos.api';
-import { CatalogoServicosApiService } from './aplicacao/catalogo-servicos-api.service';
-import {
-  AtualizarServico,
-  CadastrarServico,
-  RemoverServico,
-} from './aplicacao/servico-crud.usecases';
-import { SERVICO_REPOSITORY } from './dominio/repositorio';
-import { PrismaServicoRepository } from './infraestrutura/prisma-servico.repository';
-import { ServicosController } from './interfaces/servicos.controller';
+import { CATALOGO_SERVICOS_API } from './use-cases/catalogo-servicos.api';
+import { CatalogoServicosApiService } from './use-cases/catalogo-servicos-api.service';
+import { ServicoUseCases } from './use-cases/servico.usecases';
+import { SERVICO_REPOSITORY } from './use-cases/servico.repositorio';
+import { PrismaServicoRepository } from './adapters/gateways/prisma-servico.repositorio';
+import { ServicosController } from './adapters/controllers/servicos.controller';
 
 /**
  * Catálogo de Serviços (suporte). Expõe a porta pública de consulta (usada pelo
@@ -17,9 +13,7 @@ import { ServicosController } from './interfaces/servicos.controller';
 @Module({
   controllers: [ServicosController],
   providers: [
-    CadastrarServico,
-    AtualizarServico,
-    RemoverServico,
+    ServicoUseCases,
     { provide: SERVICO_REPOSITORY, useClass: PrismaServicoRepository },
     { provide: CATALOGO_SERVICOS_API, useClass: CatalogoServicosApiService },
   ],

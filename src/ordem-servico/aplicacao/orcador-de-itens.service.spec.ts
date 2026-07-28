@@ -1,13 +1,13 @@
-import { CatalogoServicosApi } from '../../catalogo-servicos/aplicacao/catalogo-servicos.api';
+import { CatalogoServicosApi } from '../../catalogo-servicos/use-cases/catalogo-servicos.api';
 import { EstoqueApi } from '../../estoque/aplicacao/estoque.api';
 import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
 import { SituacaoPecaOrcada } from '../dominio/itens';
-import { MontadorDeItens } from './montador-de-itens.service';
+import { OrcadorDeItens } from './orcador-de-itens.service';
 
-describe('MontadorDeItens', () => {
+describe('OrcadorDeItens', () => {
   let catalogo: jest.Mocked<CatalogoServicosApi>;
   let estoque: jest.Mocked<EstoqueApi>;
-  let montador: MontadorDeItens;
+  let orcador: OrcadorDeItens;
 
   beforeEach(() => {
     catalogo = { buscarServico: jest.fn() };
@@ -15,32 +15,32 @@ describe('MontadorDeItens', () => {
       verificarDisponibilidade: jest.fn(),
       solicitarCotacao: jest.fn(),
     };
-    montador = new MontadorDeItens(catalogo, estoque);
+    orcador = new OrcadorDeItens(catalogo, estoque);
   });
 
-  describe('montarServicos', () => {
+  describe('orcarServicos', () => {
     it('congela o preço base do catálogo', async () => {
       catalogo.buscarServico.mockResolvedValue({
         id: 's1',
         nome: 'Troca de óleo',
         precoBase: 120,
       });
-      const [item] = await montador.montarServicos([
+      const [servicoOrcado] = await orcador.orcarServicos([
         { servicoId: 's1', quantidade: 2 },
       ]);
-      expect(item.descricao).toBe('Troca de óleo');
-      expect(item.precoAplicado).toBe(120);
+      expect(servicoOrcado.descricao).toBe('Troca de óleo');
+      expect(servicoOrcado.precoAplicado).toBe(120);
     });
 
     it('rejeita serviço inexistente', async () => {
       catalogo.buscarServico.mockResolvedValue(null);
       await expect(
-        montador.montarServicos([{ servicoId: 'x', quantidade: 1 }]),
+        orcador.orcarServicos([{ servicoId: 'x', quantidade: 1 }]),
       ).rejects.toBeInstanceOf(ErroValidacao);
     });
   });
 
-  describe('montarPecas', () => {
+  describe('orcarPecas', () => {
     it('peça disponível: congela preço do estoque e marca DISPONIVEL (sem cotar)', async () => {
       estoque.verificarDisponibilidade.mockResolvedValue([
         {
@@ -52,11 +52,11 @@ describe('MontadorDeItens', () => {
           suficiente: true,
         },
       ]);
-      const [item] = await montador.montarPecas('os-1', [
+      const [pecaOrcada] = await orcador.orcarPecas('os-1', [
         { pecaId: 'p1', quantidade: 4 },
       ]);
-      expect(item.situacao).toBe(SituacaoPecaOrcada.DISPONIVEL);
-      expect(item.precoAplicado).toBe(35);
+      expect(pecaOrcada.situacao).toBe(SituacaoPecaOrcada.DISPONIVEL);
+      expect(pecaOrcada.precoAplicado).toBe(35);
       expect(estoque.solicitarCotacao).not.toHaveBeenCalled();
     });
 
@@ -76,11 +76,11 @@ describe('MontadorDeItens', () => {
         prazoDias: 7,
         fornecedor: 'F',
       });
-      const [item] = await montador.montarPecas('os-1', [
+      const [pecaOrcada] = await orcador.orcarPecas('os-1', [
         { pecaId: 'p2', quantidade: 1 },
       ]);
-      expect(item.situacao).toBe(SituacaoPecaOrcada.EM_COTACAO);
-      expect(item.precoAplicado).toBe(198);
+      expect(pecaOrcada.situacao).toBe(SituacaoPecaOrcada.EM_COTACAO);
+      expect(pecaOrcada.precoAplicado).toBe(198);
       expect(estoque.solicitarCotacao).toHaveBeenCalledWith('os-1', 'p2', 1);
     });
 
@@ -96,13 +96,13 @@ describe('MontadorDeItens', () => {
         },
       ]);
       await expect(
-        montador.montarPecas('os-1', [{ pecaId: 'x', quantidade: 1 }]),
+        orcador.orcarPecas('os-1', [{ pecaId: 'x', quantidade: 1 }]),
       ).rejects.toBeInstanceOf(ErroValidacao);
     });
 
     it('lista vazia não chama o estoque', async () => {
-      const itens = await montador.montarPecas('os-1', []);
-      expect(itens).toEqual([]);
+      const pecasOrcadas = await orcador.orcarPecas('os-1', []);
+      expect(pecasOrcadas).toEqual([]);
       expect(estoque.verificarDisponibilidade).not.toHaveBeenCalled();
     });
   });

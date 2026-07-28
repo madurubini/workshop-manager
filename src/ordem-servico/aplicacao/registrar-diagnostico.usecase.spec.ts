@@ -7,7 +7,7 @@ import { SituacaoPecaOrcada, StatusOrcamento } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { StatusOS } from '../dominio/status-os';
 import { OrdemServicoRepository } from '../dominio/repositorios';
-import { MontadorDeItens } from './montador-de-itens.service';
+import { OrcadorDeItens } from './orcador-de-itens.service';
 import { RegistrarDiagnostico } from './registrar-diagnostico.usecase';
 
 function osRecebida(): OrdemServico {
@@ -28,8 +28,8 @@ function osEmDiagnostico(): OrdemServico {
 
 describe('RegistrarDiagnostico', () => {
   let ordens: jest.Mocked<OrdemServicoRepository>;
-  let montador: jest.Mocked<
-    Pick<MontadorDeItens, 'montarServicos' | 'montarPecas'>
+  let orcador: jest.Mocked<
+    Pick<OrcadorDeItens, 'orcarServicos' | 'orcarPecas'>
   >;
   let eventos: jest.Mocked<PublicadorDeEventos>;
   let usecase: RegistrarDiagnostico;
@@ -43,8 +43,8 @@ describe('RegistrarDiagnostico', () => {
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
     };
-    montador = {
-      montarServicos: jest.fn().mockResolvedValue([
+    orcador = {
+      orcarServicos: jest.fn().mockResolvedValue([
         {
           id: 'is1',
           servicoId: 's1',
@@ -53,7 +53,7 @@ describe('RegistrarDiagnostico', () => {
           precoAplicado: 120,
         },
       ]),
-      montarPecas: jest.fn().mockResolvedValue([
+      orcarPecas: jest.fn().mockResolvedValue([
         {
           id: 'ip1',
           pecaId: 'p1',
@@ -67,7 +67,7 @@ describe('RegistrarDiagnostico', () => {
     eventos = { publicar: jest.fn() };
     usecase = new RegistrarDiagnostico(
       ordens,
-      montador as unknown as MontadorDeItens,
+      orcador as unknown as OrcadorDeItens,
       eventos,
     );
   });
