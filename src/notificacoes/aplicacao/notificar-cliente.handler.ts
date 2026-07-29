@@ -11,7 +11,7 @@ import type {
 import {
   ACOMPANHAMENTO_TOKEN,
   AcompanhamentoToken,
-} from '../../identidade/dominio/portas';
+} from '../../identidade/use-cases/acompanhamento-token';
 import { NOTIFICADOR, Notificador } from '../dominio/notificador';
 
 /**

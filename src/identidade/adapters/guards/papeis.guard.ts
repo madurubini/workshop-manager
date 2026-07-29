@@ -5,9 +5,9 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Papel } from '../dominio/usuario';
-import { UsuarioAutenticado } from '../infraestrutura/jwt.strategy';
-import { PAPEIS_CHAVE } from './papeis.decorator';
+import { Papel } from '../../entities/usuario';
+import { UsuarioAutenticado } from './jwt.strategy';
+import { PAPEIS_CHAVE } from '../decorators/papeis.decorator';
 
 /**
  * Autorização por papel. Roda DEPOIS do JwtAuthGuard (que coloca o usuário em

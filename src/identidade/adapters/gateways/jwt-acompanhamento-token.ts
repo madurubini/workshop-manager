@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
-import { AcompanhamentoToken } from '../dominio/portas';
+import { AcompanhamentoToken } from '../../use-cases/acompanhamento-token';
 
 /** Marca o token como sendo de acompanhamento (e não um login de operador). */
 const ESCOPO = 'acompanhamento';

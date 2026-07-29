@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
-import { Papel, Usuario } from '../dominio/usuario';
-import { UsuarioRepository } from '../dominio/portas';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
+import { Papel, Usuario } from '../../entities/usuario';
+import { UsuarioRepository } from '../../use-cases/usuario.repositorio';
 
 /** Adaptador Prisma da porta UsuarioRepository. */
 @Injectable()

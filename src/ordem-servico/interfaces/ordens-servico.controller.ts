@@ -18,9 +18,9 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
-import { UsuarioAtual } from '../../identidade/interfaces/usuario-atual.decorator';
-import { UsuarioAutenticado } from '../../identidade/infraestrutura/jwt.strategy';
+import { JwtAuthGuard } from '../../identidade/adapters/guards/jwt-auth.guard';
+import { UsuarioAtual } from '../../identidade/adapters/decorators/usuario-atual.decorator';
+import { UsuarioAutenticado } from '../../identidade/adapters/guards/jwt.strategy';
 import { AbrirOrdemServico } from '../aplicacao/abrir-ordem-servico.usecase';
 import { ConcluirExecucao } from '../aplicacao/concluir-execucao.usecase';
 import {

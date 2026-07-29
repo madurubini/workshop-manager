@@ -3,12 +3,10 @@ import { ErroNaoAutenticado } from '../../compartilhado/erros/erros-dominio';
 import {
   GERADOR_DE_TOKEN,
   GeradorDeToken,
-  HASH_DE_SENHA,
-  HashDeSenha,
   TokenGerado,
-  USUARIO_REPOSITORY,
-  UsuarioRepository,
-} from '../dominio/portas';
+} from './gerador-de-token';
+import { HASH_DE_SENHA, HashDeSenha } from './hash-de-senha';
+import { USUARIO_REPOSITORY, UsuarioRepository } from './usuario.repositorio';
 
 export interface EntradaAutenticarUsuario {
   username: string;

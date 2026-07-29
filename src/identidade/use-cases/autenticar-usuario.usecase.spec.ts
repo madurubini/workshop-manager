@@ -1,10 +1,8 @@
 import { ErroNaoAutenticado } from '../../compartilhado/erros/erros-dominio';
-import { Usuario } from '../dominio/usuario';
-import {
-  GeradorDeToken,
-  HashDeSenha,
-  UsuarioRepository,
-} from '../dominio/portas';
+import { Usuario } from '../entities/usuario';
+import { GeradorDeToken } from './gerador-de-token';
+import { HashDeSenha } from './hash-de-senha';
+import { UsuarioRepository } from './usuario.repositorio';
 import { AutenticarUsuario } from './autenticar-usuario.usecase';
 
 describe('AutenticarUsuario', () => {

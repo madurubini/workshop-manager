@@ -5,7 +5,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
+import { JwtAuthGuard } from '../../identidade/adapters/guards/jwt-auth.guard';
 import {
   RelatorioTempoMedio,
   RelatorioTempoMedioExecucao,

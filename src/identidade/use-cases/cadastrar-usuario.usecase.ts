@@ -1,16 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import {
+  GERADOR_DE_ID,
+  GeradorDeId,
+} from '../../compartilhado/dominio/gerador-de-id';
 import {
   ErroConflito,
   ErroValidacao,
 } from '../../compartilhado/erros/erros-dominio';
-import { Papel, Usuario } from '../dominio/usuario';
-import {
-  HASH_DE_SENHA,
-  HashDeSenha,
-  USUARIO_REPOSITORY,
-  UsuarioRepository,
-} from '../dominio/portas';
+import { Papel, Usuario } from '../entities/usuario';
+import { HASH_DE_SENHA, HashDeSenha } from './hash-de-senha';
+import { USUARIO_REPOSITORY, UsuarioRepository } from './usuario.repositorio';
 
 const PAPEIS_VALIDOS: Papel[] = ['RECEPCIONISTA', 'MECANICO', 'GESTOR'];
 
@@ -39,6 +38,8 @@ export class CadastrarUsuario {
     private readonly usuarios: UsuarioRepository,
     @Inject(HASH_DE_SENHA)
     private readonly hash: HashDeSenha,
+    @Inject(GERADOR_DE_ID)
+    private readonly ids: GeradorDeId,
   ) {}
 
   async executar(entrada: EntradaCadastrarUsuario): Promise<UsuarioCriado> {
@@ -63,7 +64,7 @@ export class CadastrarUsuario {
     }
 
     const usuario: Usuario = {
-      id: randomUUID(),
+      id: this.ids.novo(),
       username,
       senhaHash: await this.hash.gerar(entrada.senha),
       papel: entrada.papel,

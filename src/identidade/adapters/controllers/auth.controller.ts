@@ -5,9 +5,9 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { AutenticarUsuario } from '../aplicacao/autenticar-usuario.usecase';
-import { LoginDto } from './dto/login.dto';
-import { RespostaLoginDto } from './dto/resposta-login.dto';
+import { AutenticarUsuario } from '../../use-cases/autenticar-usuario.usecase';
+import { LoginDto } from '../dto/login.dto';
+import { RespostaLoginDto } from '../dto/resposta-login.dto';
 
 @ApiTags('Autenticação')
 @Controller('auth')

@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../identidade/interfaces/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../identidade/adapters/guards/jwt-auth.guard';
 import { PecaUseCases } from '../../use-cases/peca.usecases';
 import { apresentarPeca } from '../presenters/peca.presenter';
 import {

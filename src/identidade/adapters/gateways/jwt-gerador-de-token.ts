@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { ConteudoToken, GeradorDeToken, TokenGerado } from '../dominio/portas';
+import {
+  ConteudoToken,
+  GeradorDeToken,
+  TokenGerado,
+} from '../../use-cases/gerador-de-token';
 
 /** Adaptador @nestjs/jwt da porta GeradorDeToken. */
 @Injectable()

@@ -13,14 +13,14 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { CadastrarUsuario } from '../aplicacao/cadastrar-usuario.usecase';
+import { CadastrarUsuario } from '../../use-cases/cadastrar-usuario.usecase';
 import {
   CadastrarUsuarioDto,
   UsuarioCriadoDto,
-} from './dto/cadastrar-usuario.dto';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { Papeis } from './papeis.decorator';
-import { PapeisGuard } from './papeis.guard';
+} from '../dto/cadastrar-usuario.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { Papeis } from '../decorators/papeis.decorator';
+import { PapeisGuard } from '../guards/papeis.guard';
 
 /**
  * Cadastro de usuários administrativos. Rota protegida e restrita ao GESTOR:

@@ -3,23 +3,21 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { StringValue } from 'ms';
-import { AutenticarUsuario } from './aplicacao/autenticar-usuario.usecase';
-import { CadastrarUsuario } from './aplicacao/cadastrar-usuario.usecase';
-import { BcryptHashDeSenha } from './infraestrutura/bcrypt-hash-de-senha';
-import { JwtAcompanhamentoToken } from './infraestrutura/jwt-acompanhamento-token';
-import { JwtGeradorDeToken } from './infraestrutura/jwt-gerador-de-token';
-import { JwtStrategy } from './infraestrutura/jwt.strategy';
-import { PrismaUsuarioRepository } from './infraestrutura/prisma-usuario.repository';
-import {
-  ACOMPANHAMENTO_TOKEN,
-  GERADOR_DE_TOKEN,
-  HASH_DE_SENHA,
-  USUARIO_REPOSITORY,
-} from './dominio/portas';
-import { AcompanhamentoGuard } from './interfaces/acompanhamento.guard';
-import { AuthController } from './interfaces/auth.controller';
-import { PapeisGuard } from './interfaces/papeis.guard';
-import { UsuariosController } from './interfaces/usuarios.controller';
+import { AutenticarUsuario } from './use-cases/autenticar-usuario.usecase';
+import { CadastrarUsuario } from './use-cases/cadastrar-usuario.usecase';
+import { USUARIO_REPOSITORY } from './use-cases/usuario.repositorio';
+import { HASH_DE_SENHA } from './use-cases/hash-de-senha';
+import { GERADOR_DE_TOKEN } from './use-cases/gerador-de-token';
+import { ACOMPANHAMENTO_TOKEN } from './use-cases/acompanhamento-token';
+import { BcryptHashDeSenha } from './adapters/gateways/bcrypt-hash-de-senha';
+import { JwtAcompanhamentoToken } from './adapters/gateways/jwt-acompanhamento-token';
+import { JwtGeradorDeToken } from './adapters/gateways/jwt-gerador-de-token';
+import { PrismaUsuarioRepository } from './adapters/gateways/prisma-usuario.repositorio';
+import { JwtStrategy } from './adapters/guards/jwt.strategy';
+import { PapeisGuard } from './adapters/guards/papeis.guard';
+import { AcompanhamentoGuard } from './adapters/guards/acompanhamento.guard';
+import { AuthController } from './adapters/controllers/auth.controller';
+import { UsuariosController } from './adapters/controllers/usuarios.controller';
 
 /**
  * Contexto Identidade e Acesso (transversal às rotas administrativas).

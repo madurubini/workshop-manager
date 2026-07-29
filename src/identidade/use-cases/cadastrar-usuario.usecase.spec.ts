@@ -1,14 +1,17 @@
+import { GeradorDeId } from '../../compartilhado/dominio/gerador-de-id';
 import {
   ErroConflito,
   ErroValidacao,
 } from '../../compartilhado/erros/erros-dominio';
-import { Usuario } from '../dominio/usuario';
-import { HashDeSenha, UsuarioRepository } from '../dominio/portas';
+import { Usuario } from '../entities/usuario';
+import { HashDeSenha } from './hash-de-senha';
+import { UsuarioRepository } from './usuario.repositorio';
 import { CadastrarUsuario } from './cadastrar-usuario.usecase';
 
 describe('CadastrarUsuario', () => {
   let repo: jest.Mocked<UsuarioRepository>;
   let hash: jest.Mocked<HashDeSenha>;
+  let idGenerator: jest.Mocked<GeradorDeId>;
   let usecase: CadastrarUsuario;
 
   beforeEach(() => {
@@ -17,7 +20,8 @@ describe('CadastrarUsuario', () => {
       comparar: jest.fn(),
       gerar: jest.fn().mockResolvedValue('hash-da-senha'),
     };
-    usecase = new CadastrarUsuario(repo, hash);
+    idGenerator = { novo: jest.fn().mockReturnValue('id-fixo') };
+    usecase = new CadastrarUsuario(repo, hash, idGenerator);
   });
 
   it('cadastra um usuário novo, gravando apenas o hash da senha', async () => {

@@ -7,7 +7,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { ACOMPANHAMENTO_TOKEN, AcompanhamentoToken } from '../dominio/portas';
+import {
+  ACOMPANHAMENTO_TOKEN,
+  AcompanhamentoToken,
+} from '../../use-cases/acompanhamento-token';
 
 /**
  * Protege ações do cliente no acompanhamento (aprovar/recusar orçamento). Não

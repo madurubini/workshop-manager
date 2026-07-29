@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { AcompanhamentoToken } from '../dominio/portas';
+import { AcompanhamentoToken } from '../../use-cases/acompanhamento-token';
 import { AcompanhamentoGuard } from './acompanhamento.guard';
 
 function contexto(req: {

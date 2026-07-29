@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { Papel } from '../dominio/usuario';
+import { Papel } from '../../entities/usuario';
 
 export const PAPEIS_CHAVE = 'papeis';
 

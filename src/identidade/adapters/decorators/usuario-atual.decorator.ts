@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { UsuarioAutenticado } from '../infraestrutura/jwt.strategy';
+import { UsuarioAutenticado } from '../guards/jwt.strategy';
 
 /** Injeta o usuário autenticado (vindo do JWT) no handler do controller. */
 export const UsuarioAtual = createParamDecorator(

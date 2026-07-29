@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AcompanhamentoGuard } from '../../identidade/interfaces/acompanhamento.guard';
+import { AcompanhamentoGuard } from '../../identidade/adapters/guards/acompanhamento.guard';
 import { AprovarOrcamento } from '../aplicacao/aprovar-orcamento.usecase';
 import { RecusarOrcamento } from '../aplicacao/recusar-orcamento.usecase';
 import {

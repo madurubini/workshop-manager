@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsIn, IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { Papel } from '../../dominio/usuario';
+import { Papel } from '../../entities/usuario';
 
 const PAPEIS: Papel[] = ['RECEPCIONISTA', 'MECANICO', 'GESTOR'];
 

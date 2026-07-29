@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../identidade/interfaces/jwt-auth.guard';
+import { JwtAuthGuard } from '../../../identidade/adapters/guards/jwt-auth.guard';
 import { ClienteUseCases } from '../../use-cases/cliente.usecases';
 import { apresentarCliente } from '../presenters/cliente.presenter';
 import {
