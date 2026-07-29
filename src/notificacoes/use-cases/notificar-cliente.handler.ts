@@ -12,7 +12,7 @@ import {
   ACOMPANHAMENTO_TOKEN,
   AcompanhamentoToken,
 } from '../../identidade/use-cases/acompanhamento-token';
-import { NOTIFICADOR, Notificador } from '../dominio/notificador';
+import { NOTIFICADOR, Notificador } from './notificador';
 
 /**
  * Assinantes de eventos do contexto de notificações. Demonstra o fan-out do

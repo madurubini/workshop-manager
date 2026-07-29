@@ -6,7 +6,7 @@ import type {
   OrcamentoRecusado,
   VeiculoEntregue,
 } from '../../ordem-servico/dominio/eventos';
-import { Notificador } from '../dominio/notificador';
+import { Notificador } from './notificador';
 import { NotificarCliente } from './notificar-cliente.handler';
 import { ReenviarPendentes } from './reenviar-pendentes.policy';
 

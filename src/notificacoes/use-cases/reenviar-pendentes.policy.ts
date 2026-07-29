@@ -4,7 +4,7 @@ import {
   ORDEM_SERVICO_CONSULTA,
   OrdemServicoConsultaApi,
 } from '../../ordem-servico/aplicacao/ordem-servico-consulta.api';
-import { NOTIFICADOR, Notificador } from '../dominio/notificador';
+import { NOTIFICADOR, Notificador } from './notificador';
 
 /**
  * Política "cliente sem resposta": enquanto houver OS aguardando aprovação, o

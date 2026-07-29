@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Notificador, TipoNotificacao } from '../dominio/notificador';
+import { Notificador, TipoNotificacao } from '../../use-cases/notificador';
 
 /**
  * Adaptador simulado do Serviço de Notificações (MVP): registra no log o aviso
