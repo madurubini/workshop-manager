@@ -1,11 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientesVeiculosApi } from './clientes-veiculos.api';
-import {
-  CLIENTE_REPOSITORY,
-  ClienteRepository,
-  VEICULO_REPOSITORY,
-  VeiculoRepository,
-} from '../dominio/repositorios';
+import { CLIENTE_REPOSITORY, ClienteRepository } from './cliente.repositorio';
+import { VEICULO_REPOSITORY, VeiculoRepository } from './veiculo.repositorio';
 
 /**
  * Implementação do open-host service. Traduz consultas externas em buscas nos

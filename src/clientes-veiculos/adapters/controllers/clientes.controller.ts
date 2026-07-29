@@ -5,62 +5,44 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
-  NotFoundException,
   Param,
   Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
-import { CadastrarCliente } from '../aplicacao/cadastrar-cliente.usecase';
-import {
-  AtualizarCliente,
-  RemoverCliente,
-} from '../aplicacao/gerenciar-cliente.usecases';
-import { CLIENTE_REPOSITORY, ClienteRepository } from '../dominio/repositorios';
+import { JwtAuthGuard } from '../../../identidade/interfaces/jwt-auth.guard';
+import { ClienteUseCases } from '../../use-cases/cliente.usecases';
+import { apresentarCliente } from '../presenters/cliente.presenter';
 import {
   AtualizarClienteDto,
   ClienteRespostaDto,
   CriarClienteDto,
-} from './dtos';
+} from '../dtos';
 
 @ApiTags('Clientes')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('clientes')
 export class ClientesController {
-  constructor(
-    private readonly cadastrarCliente: CadastrarCliente,
-    private readonly atualizarCliente: AtualizarCliente,
-    private readonly removerCliente: RemoverCliente,
-    @Inject(CLIENTE_REPOSITORY)
-    private readonly clientes: ClienteRepository,
-  ) {}
+  constructor(private readonly clientes: ClienteUseCases) {}
 
   @Post()
   @ApiOperation({ summary: 'Cadastra um cliente (valida CPF/CNPJ, único)' })
   async criar(@Body() dto: CriarClienteDto): Promise<ClienteRespostaDto> {
-    const cliente = await this.cadastrarCliente.executar(dto);
-    return ClienteRespostaDto.de(cliente);
+    return apresentarCliente(await this.clientes.cadastrar(dto));
   }
 
   @Get()
   @ApiOperation({ summary: 'Lista os clientes' })
   async listar(): Promise<ClienteRespostaDto[]> {
-    const clientes = await this.clientes.listar();
-    return clientes.map(ClienteRespostaDto.de);
+    return (await this.clientes.listar()).map(apresentarCliente);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detalha um cliente' })
   async porId(@Param('id') id: string): Promise<ClienteRespostaDto> {
-    const cliente = await this.clientes.buscarPorId(id);
-    if (!cliente) {
-      throw new NotFoundException('Cliente não encontrado.');
-    }
-    return ClienteRespostaDto.de(cliente);
+    return apresentarCliente(await this.clientes.buscar(id));
   }
 
   @Put(':id')
@@ -69,14 +51,13 @@ export class ClientesController {
     @Param('id') id: string,
     @Body() dto: AtualizarClienteDto,
   ): Promise<ClienteRespostaDto> {
-    const cliente = await this.atualizarCliente.executar({ id, ...dto });
-    return ClienteRespostaDto.de(cliente);
+    return apresentarCliente(await this.clientes.atualizar({ id, ...dto }));
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove o cliente (soft delete)' })
   async remover(@Param('id') id: string): Promise<void> {
-    await this.removerCliente.executar({ id });
+    await this.clientes.remover(id);
   }
 }

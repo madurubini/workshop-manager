@@ -1,6 +1,7 @@
-import { Cliente } from '../dominio/cliente';
-import { Veiculo } from '../dominio/veiculo';
-import { ClienteRepository, VeiculoRepository } from '../dominio/repositorios';
+import { Cliente } from '../entities/cliente';
+import { Veiculo } from '../entities/veiculo';
+import { ClienteRepository } from './cliente.repositorio';
+import { VeiculoRepository } from './veiculo.repositorio';
 import { ClientesVeiculosApiService } from './clientes-veiculos-api.service';
 
 describe('ClientesVeiculosApiService (porta pública / open-host)', () => {

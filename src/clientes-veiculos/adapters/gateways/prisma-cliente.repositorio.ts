@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Cliente as ClientePrisma } from '@prisma/client';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
-import { Cliente } from '../dominio/cliente';
-import { ClienteRepository } from '../dominio/repositorios';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
+import { Cliente } from '../../entities/cliente';
+import { ClienteRepository } from '../../use-cases/cliente.repositorio';
 
-/** Adaptador Prisma da porta ClienteRepository. */
+/** Gateway Prisma da porta ClienteRepository. */
 @Injectable()
 export class PrismaClienteRepository implements ClienteRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -53,17 +53,17 @@ export class PrismaClienteRepository implements ClienteRepository {
       where: { ativo: true }, // soft delete: não retorna inativos
       orderBy: { criadoEm: 'desc' },
     });
-    return registros.map((r) => this.mapear(r));
+    return registros.map((registro) => this.mapear(registro));
   }
 
-  private mapear(r: ClientePrisma): Cliente {
-    return Cliente.restaurar(r.id, {
-      documento: r.documento,
-      nome: r.nome,
-      email: r.email,
-      telefone: r.telefone,
-      ativo: r.ativo,
-      criadoEm: r.criadoEm,
+  private mapear(registro: ClientePrisma): Cliente {
+    return Cliente.restaurar(registro.id, {
+      documento: registro.documento,
+      nome: registro.nome,
+      email: registro.email,
+      telefone: registro.telefone,
+      ativo: registro.ativo,
+      criadoEm: registro.criadoEm,
     });
   }
 }

@@ -5,39 +5,27 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
-  NotFoundException,
   Param,
   Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
-import { CadastrarVeiculo } from '../aplicacao/cadastrar-veiculo.usecase';
-import {
-  AtualizarVeiculo,
-  RemoverVeiculo,
-} from '../aplicacao/gerenciar-veiculo.usecases';
-import { VEICULO_REPOSITORY, VeiculoRepository } from '../dominio/repositorios';
+import { JwtAuthGuard } from '../../../identidade/interfaces/jwt-auth.guard';
+import { VeiculoUseCases } from '../../use-cases/veiculo.usecases';
+import { apresentarVeiculo } from '../presenters/veiculo.presenter';
 import {
   AtualizarVeiculoDto,
   CriarVeiculoDto,
   VeiculoRespostaDto,
-} from './dtos';
+} from '../dtos';
 
 @ApiTags('Veículos')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller()
 export class VeiculosController {
-  constructor(
-    private readonly cadastrarVeiculo: CadastrarVeiculo,
-    private readonly atualizarVeiculo: AtualizarVeiculo,
-    private readonly removerVeiculo: RemoverVeiculo,
-    @Inject(VEICULO_REPOSITORY)
-    private readonly veiculos: VeiculoRepository,
-  ) {}
+  constructor(private readonly veiculos: VeiculoUseCases) {}
 
   @Post('clientes/:clienteId/veiculos')
   @ApiOperation({ summary: 'Cadastra um veículo para o cliente (placa única)' })
@@ -45,11 +33,9 @@ export class VeiculosController {
     @Param('clienteId') clienteId: string,
     @Body() dto: CriarVeiculoDto,
   ): Promise<VeiculoRespostaDto> {
-    const veiculo = await this.cadastrarVeiculo.executar({
-      clienteId,
-      ...dto,
-    });
-    return VeiculoRespostaDto.de(veiculo);
+    return apresentarVeiculo(
+      await this.veiculos.cadastrar({ clienteId, ...dto }),
+    );
   }
 
   @Get('clientes/:clienteId/veiculos')
@@ -57,18 +43,15 @@ export class VeiculosController {
   async listarDoCliente(
     @Param('clienteId') clienteId: string,
   ): Promise<VeiculoRespostaDto[]> {
-    const veiculos = await this.veiculos.listarPorCliente(clienteId);
-    return veiculos.map(VeiculoRespostaDto.de);
+    return (await this.veiculos.listarDoCliente(clienteId)).map(
+      apresentarVeiculo,
+    );
   }
 
   @Get('veiculos/:id')
   @ApiOperation({ summary: 'Detalha um veículo' })
   async porId(@Param('id') id: string): Promise<VeiculoRespostaDto> {
-    const veiculo = await this.veiculos.buscarPorId(id);
-    if (!veiculo) {
-      throw new NotFoundException('Veículo não encontrado.');
-    }
-    return VeiculoRespostaDto.de(veiculo);
+    return apresentarVeiculo(await this.veiculos.buscar(id));
   }
 
   @Put('veiculos/:id')
@@ -77,14 +60,13 @@ export class VeiculosController {
     @Param('id') id: string,
     @Body() dto: AtualizarVeiculoDto,
   ): Promise<VeiculoRespostaDto> {
-    const veiculo = await this.atualizarVeiculo.executar({ id, ...dto });
-    return VeiculoRespostaDto.de(veiculo);
+    return apresentarVeiculo(await this.veiculos.atualizar({ id, ...dto }));
   }
 
   @Delete('veiculos/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove o veículo (soft delete)' })
   async remover(@Param('id') id: string): Promise<void> {
-    await this.removerVeiculo.executar({ id });
+    await this.veiculos.remover(id);
   }
 }

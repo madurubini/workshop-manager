@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Veiculo as VeiculoPrisma } from '@prisma/client';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
-import { Veiculo } from '../dominio/veiculo';
-import { VeiculoRepository } from '../dominio/repositorios';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
+import { Veiculo } from '../../entities/veiculo';
+import { VeiculoRepository } from '../../use-cases/veiculo.repositorio';
 
-/** Adaptador Prisma da porta VeiculoRepository. */
+/** Gateway Prisma da porta VeiculoRepository. */
 @Injectable()
 export class PrismaVeiculoRepository implements VeiculoRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -53,18 +53,18 @@ export class PrismaVeiculoRepository implements VeiculoRepository {
       where: { clienteId, ativo: true }, // soft delete: não retorna inativos
       orderBy: { criadoEm: 'desc' },
     });
-    return registros.map((r) => this.mapear(r));
+    return registros.map((registro) => this.mapear(registro));
   }
 
-  private mapear(r: VeiculoPrisma): Veiculo {
-    return Veiculo.restaurar(r.id, {
-      clienteId: r.clienteId,
-      placa: r.placa,
-      marca: r.marca,
-      modelo: r.modelo,
-      ano: r.ano,
-      ativo: r.ativo,
-      criadoEm: r.criadoEm,
+  private mapear(registro: VeiculoPrisma): Veiculo {
+    return Veiculo.restaurar(registro.id, {
+      clienteId: registro.clienteId,
+      placa: registro.placa,
+      marca: registro.marca,
+      modelo: registro.modelo,
+      ano: registro.ano,
+      ativo: registro.ativo,
+      criadoEm: registro.criadoEm,
     });
   }
 }

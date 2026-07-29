@@ -8,8 +8,6 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { Cliente } from '../dominio/cliente';
-import { Veiculo } from '../dominio/veiculo';
 
 export class CriarClienteDto {
   @ApiProperty({ example: '529.982.247-25', description: 'CPF ou CNPJ' })
@@ -106,18 +104,6 @@ export class ClienteRespostaDto {
   @ApiPropertyOptional() email!: string | null;
   @ApiPropertyOptional() telefone!: string | null;
   @ApiProperty() ativo!: boolean;
-
-  static de(cliente: Cliente): ClienteRespostaDto {
-    return {
-      id: cliente.id,
-      tipoDocumento: cliente.documento.tipo,
-      documento: cliente.documento.formatado,
-      nome: cliente.nome,
-      email: cliente.email,
-      telefone: cliente.telefone,
-      ativo: cliente.ativo,
-    };
-  }
 }
 
 export class VeiculoRespostaDto {
@@ -128,16 +114,4 @@ export class VeiculoRespostaDto {
   @ApiProperty() modelo!: string;
   @ApiProperty() ano!: number;
   @ApiProperty() ativo!: boolean;
-
-  static de(veiculo: Veiculo): VeiculoRespostaDto {
-    return {
-      id: veiculo.id,
-      clienteId: veiculo.clienteId,
-      placa: veiculo.placa.valor,
-      marca: veiculo.marca,
-      modelo: veiculo.modelo,
-      ano: veiculo.ano,
-      ativo: veiculo.ativo,
-    };
-  }
 }

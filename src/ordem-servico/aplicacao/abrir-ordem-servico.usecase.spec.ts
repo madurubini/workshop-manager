@@ -1,4 +1,4 @@
-import { ClientesVeiculosApi } from '../../clientes-veiculos/aplicacao/clientes-veiculos.api';
+import { ClientesVeiculosApi } from '../../clientes-veiculos/use-cases/clientes-veiculos.api';
 import { PublicadorDeEventos } from '../../compartilhado/dominio/publicador-de-eventos';
 import {
   ErroNaoEncontrado,

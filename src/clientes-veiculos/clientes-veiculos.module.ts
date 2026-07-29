@@ -1,21 +1,14 @@
 import { Module } from '@nestjs/common';
-import { CadastrarCliente } from './aplicacao/cadastrar-cliente.usecase';
-import { CadastrarVeiculo } from './aplicacao/cadastrar-veiculo.usecase';
-import {
-  AtualizarCliente,
-  RemoverCliente,
-} from './aplicacao/gerenciar-cliente.usecases';
-import {
-  AtualizarVeiculo,
-  RemoverVeiculo,
-} from './aplicacao/gerenciar-veiculo.usecases';
-import { CLIENTES_VEICULOS_API } from './aplicacao/clientes-veiculos.api';
-import { ClientesVeiculosApiService } from './aplicacao/clientes-veiculos-api.service';
-import { CLIENTE_REPOSITORY, VEICULO_REPOSITORY } from './dominio/repositorios';
-import { PrismaClienteRepository } from './infraestrutura/prisma-cliente.repository';
-import { PrismaVeiculoRepository } from './infraestrutura/prisma-veiculo.repository';
-import { ClientesController } from './interfaces/clientes.controller';
-import { VeiculosController } from './interfaces/veiculos.controller';
+import { ClienteUseCases } from './use-cases/cliente.usecases';
+import { VeiculoUseCases } from './use-cases/veiculo.usecases';
+import { CLIENTES_VEICULOS_API } from './use-cases/clientes-veiculos.api';
+import { ClientesVeiculosApiService } from './use-cases/clientes-veiculos-api.service';
+import { CLIENTE_REPOSITORY } from './use-cases/cliente.repositorio';
+import { VEICULO_REPOSITORY } from './use-cases/veiculo.repositorio';
+import { PrismaClienteRepository } from './adapters/gateways/prisma-cliente.repositorio';
+import { PrismaVeiculoRepository } from './adapters/gateways/prisma-veiculo.repositorio';
+import { ClientesController } from './adapters/controllers/clientes.controller';
+import { VeiculosController } from './adapters/controllers/veiculos.controller';
 
 /**
  * Contexto Clientes e Veículos. Note o que é exportado: apenas a porta pública
@@ -26,12 +19,8 @@ import { VeiculosController } from './interfaces/veiculos.controller';
 @Module({
   controllers: [ClientesController, VeiculosController],
   providers: [
-    CadastrarCliente,
-    CadastrarVeiculo,
-    AtualizarCliente,
-    RemoverCliente,
-    AtualizarVeiculo,
-    RemoverVeiculo,
+    ClienteUseCases,
+    VeiculoUseCases,
     { provide: CLIENTE_REPOSITORY, useClass: PrismaClienteRepository },
     { provide: VEICULO_REPOSITORY, useClass: PrismaVeiculoRepository },
     { provide: CLIENTES_VEICULOS_API, useClass: ClientesVeiculosApiService },

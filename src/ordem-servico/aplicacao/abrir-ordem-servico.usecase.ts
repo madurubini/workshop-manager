@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import {
   CLIENTES_VEICULOS_API,
   ClientesVeiculosApi,
-} from '../../clientes-veiculos/aplicacao/clientes-veiculos.api';
+} from '../../clientes-veiculos/use-cases/clientes-veiculos.api';
 import {
   PUBLICADOR_DE_EVENTOS,
   PublicadorDeEventos,
