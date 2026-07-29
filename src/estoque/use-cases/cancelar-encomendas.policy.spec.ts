@@ -1,5 +1,5 @@
 import type { OSCancelada } from '../../ordem-servico/dominio/eventos';
-import { EncomendaRepository } from '../dominio/repositorios';
+import { EncomendaRepository } from './encomenda.repositorio';
 import { CancelarEncomendasNoCancelamento } from './cancelar-encomendas.policy';
 
 describe('CancelarEncomendasNoCancelamento (política do estoque)', () => {

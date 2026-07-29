@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
 import {
   DadosEncomenda,
   EncomendaRepository,
   StatusEncomenda,
-} from '../dominio/repositorios';
+} from '../../use-cases/encomenda.repositorio';
 
+/** Gateway Prisma da porta EncomendaRepository. */
 @Injectable()
 export class PrismaEncomendaRepository implements EncomendaRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -32,12 +33,12 @@ export class PrismaEncomendaRepository implements EncomendaRepository {
       where: { pecaId, status: 'PENDENTE' },
       orderBy: { criadoEm: 'asc' }, // FIFO: quem encomendou primeiro é atendido antes
     });
-    return registros.map((r) => ({
-      id: r.id,
-      pecaId: r.pecaId,
-      ordemId: r.ordemId,
-      quantidade: r.quantidade,
-      status: r.status as StatusEncomenda,
+    return registros.map((registro) => ({
+      id: registro.id,
+      pecaId: registro.pecaId,
+      ordemId: registro.ordemId,
+      quantidade: registro.quantidade,
+      status: registro.status as StatusEncomenda,
     }));
   }
 

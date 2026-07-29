@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CotacaoFornecedor, Fornecedor } from '../dominio/fornecedor';
+import { CotacaoFornecedor, Fornecedor } from '../../use-cases/fornecedor';
 
 /**
  * Adaptador simulado do sistema externo Fornecedor (MVP). Em produção, daria

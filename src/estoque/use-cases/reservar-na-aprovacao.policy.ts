@@ -2,13 +2,12 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 // Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
 import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
-import { FORNECEDOR, Fornecedor } from '../dominio/fornecedor';
+import { FORNECEDOR, Fornecedor } from './fornecedor';
+import { PECA_REPOSITORY, PecaRepository } from './peca.repositorio';
 import {
   ENCOMENDA_REPOSITORY,
   EncomendaRepository,
-  PECA_REPOSITORY,
-  PecaRepository,
-} from '../dominio/repositorios';
+} from './encomenda.repositorio';
 
 /**
  * Política do Estoque: ao aprovar o orçamento, reserva as peças disponíveis e

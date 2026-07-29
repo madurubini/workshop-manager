@@ -1,6 +1,7 @@
 import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
-import { Fornecedor } from '../dominio/fornecedor';
-import { EncomendaRepository, PecaRepository } from '../dominio/repositorios';
+import { Fornecedor } from './fornecedor';
+import { PecaRepository } from './peca.repositorio';
+import { EncomendaRepository } from './encomenda.repositorio';
 import { ReservarNaAprovacao } from './reservar-na-aprovacao.policy';
 
 describe('ReservarNaAprovacao (política do estoque)', () => {

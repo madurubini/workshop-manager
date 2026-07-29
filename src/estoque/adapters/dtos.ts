@@ -8,7 +8,6 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { Peca } from '../dominio/peca';
 
 export class CriarPecaDto {
   @ApiProperty({ example: 'FILTRO-OLEO' })
@@ -72,17 +71,4 @@ export class PecaRespostaDto {
   @ApiProperty() reservado!: number;
   @ApiProperty({ description: 'saldoFisico - reservado' }) disponivel!: number;
   @ApiProperty() ativo!: boolean;
-
-  static de(peca: Peca): PecaRespostaDto {
-    return {
-      id: peca.id,
-      codigo: peca.codigo,
-      nome: peca.nome,
-      precoUnitario: peca.precoUnitario,
-      saldoFisico: peca.saldoFisico,
-      reservado: peca.reservado,
-      disponivel: peca.disponivel,
-      ativo: peca.ativo,
-    };
-  }
 }

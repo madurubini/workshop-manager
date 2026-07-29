@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
-import { CotacaoRepository, DadosCotacao } from '../dominio/repositorios';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
+import {
+  CotacaoRepository,
+  DadosCotacao,
+} from '../../use-cases/cotacao.repositorio';
 
+/** Gateway Prisma da porta CotacaoRepository. */
 @Injectable()
 export class PrismaCotacaoRepository implements CotacaoRepository {
   constructor(private readonly prisma: PrismaService) {}

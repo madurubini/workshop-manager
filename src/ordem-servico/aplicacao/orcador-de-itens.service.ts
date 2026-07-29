@@ -4,7 +4,7 @@ import {
   CATALOGO_SERVICOS_API,
   CatalogoServicosApi,
 } from '../../catalogo-servicos/use-cases/catalogo-servicos.api';
-import { ESTOQUE_API, EstoqueApi } from '../../estoque/aplicacao/estoque.api';
+import { ESTOQUE_API, EstoqueApi } from '../../estoque/use-cases/estoque.api';
 import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
 import {
   PecaOrcada,

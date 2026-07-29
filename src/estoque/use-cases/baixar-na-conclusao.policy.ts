@@ -1,12 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { ExecucaoConcluida } from '../../ordem-servico/dominio/eventos';
-import {
-  PECA_REPOSITORY,
-  PecaRepository,
-  RESERVA_REPOSITORY,
-  ReservaRepository,
-} from '../dominio/repositorios';
+import { PECA_REPOSITORY, PecaRepository } from './peca.repositorio';
+import { RESERVA_REPOSITORY, ReservaRepository } from './reserva.repositorio';
 
 /**
  * Política do Estoque: ao concluir a execução, dá baixa nas peças reservadas

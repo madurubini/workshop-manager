@@ -5,7 +5,7 @@ import type { OSCancelada } from '../../ordem-servico/dominio/eventos';
 import {
   ENCOMENDA_REPOSITORY,
   EncomendaRepository,
-} from '../dominio/repositorios';
+} from './encomenda.repositorio';
 
 /**
  * Política do Estoque: ao cancelar a OS, cancela as encomendas PENDENTE dela —

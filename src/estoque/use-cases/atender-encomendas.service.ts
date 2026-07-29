@@ -3,13 +3,12 @@ import {
   PUBLICADOR_DE_EVENTOS,
   PublicadorDeEventos,
 } from '../../compartilhado/dominio/publicador-de-eventos';
-import { PecaRecebida } from '../dominio/eventos';
+import { PecaRecebida } from '../entities/eventos';
+import { PECA_REPOSITORY, PecaRepository } from './peca.repositorio';
 import {
   ENCOMENDA_REPOSITORY,
   EncomendaRepository,
-  PECA_REPOSITORY,
-  PecaRepository,
-} from '../dominio/repositorios';
+} from './encomenda.repositorio';
 
 /**
  * Quando uma peça dá ENTRADA no estoque, atende as encomendas PENDENTE daquela

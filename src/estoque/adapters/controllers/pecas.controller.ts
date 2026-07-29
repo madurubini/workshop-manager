@@ -5,8 +5,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Inject,
-  NotFoundException,
   Param,
   Patch,
   Post,
@@ -14,55 +12,39 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../identidade/interfaces/jwt-auth.guard';
-import {
-  AjustarEstoque,
-  AtualizarPeca,
-  CadastrarPeca,
-  RemoverPeca,
-} from '../aplicacao/peca-crud.usecases';
-import { PECA_REPOSITORY, PecaRepository } from '../dominio/repositorios';
+import { JwtAuthGuard } from '../../../identidade/interfaces/jwt-auth.guard';
+import { PecaUseCases } from '../../use-cases/peca.usecases';
+import { apresentarPeca } from '../presenters/peca.presenter';
 import {
   AjusteEstoqueDto,
   AtualizarPecaDto,
   CriarPecaDto,
   PecaRespostaDto,
-} from './dtos';
+} from '../dtos';
 
 @ApiTags('Peças e estoque')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('pecas')
 export class PecasController {
-  constructor(
-    private readonly cadastrar: CadastrarPeca,
-    private readonly atualizar: AtualizarPeca,
-    private readonly remover: RemoverPeca,
-    private readonly ajustar: AjustarEstoque,
-    @Inject(PECA_REPOSITORY)
-    private readonly pecas: PecaRepository,
-  ) {}
+  constructor(private readonly pecas: PecaUseCases) {}
 
   @Post()
   @ApiOperation({ summary: 'Cadastra uma peça (código único)' })
   async criar(@Body() dto: CriarPecaDto): Promise<PecaRespostaDto> {
-    return PecaRespostaDto.de(await this.cadastrar.executar(dto));
+    return apresentarPeca(await this.pecas.cadastrar(dto));
   }
 
   @Get()
   @ApiOperation({ summary: 'Lista as peças ativas' })
   async listar(): Promise<PecaRespostaDto[]> {
-    return (await this.pecas.listar()).map(PecaRespostaDto.de);
+    return (await this.pecas.listar()).map(apresentarPeca);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detalha uma peça' })
   async porId(@Param('id') id: string): Promise<PecaRespostaDto> {
-    const peca = await this.pecas.buscarPorId(id);
-    if (!peca) {
-      throw new NotFoundException('Peça não encontrada.');
-    }
-    return PecaRespostaDto.de(peca);
+    return apresentarPeca(await this.pecas.buscar(id));
   }
 
   @Put(':id')
@@ -71,14 +53,14 @@ export class PecasController {
     @Param('id') id: string,
     @Body() dto: AtualizarPecaDto,
   ): Promise<PecaRespostaDto> {
-    return PecaRespostaDto.de(await this.atualizar.executar({ id, ...dto }));
+    return apresentarPeca(await this.pecas.atualizar({ id, ...dto }));
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove uma peça (soft delete)' })
   async excluir(@Param('id') id: string): Promise<void> {
-    await this.remover.executar({ id });
+    await this.pecas.remover(id);
   }
 
   @Patch(':id/estoque')
@@ -87,6 +69,6 @@ export class PecasController {
     @Param('id') id: string,
     @Body() dto: AjusteEstoqueDto,
   ): Promise<PecaRespostaDto> {
-    return PecaRespostaDto.de(await this.ajustar.executar({ id, ...dto }));
+    return apresentarPeca(await this.pecas.ajustarEstoque({ id, ...dto }));
   }
 }

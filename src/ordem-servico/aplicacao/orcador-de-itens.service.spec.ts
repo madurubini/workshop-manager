@@ -1,5 +1,5 @@
 import { CatalogoServicosApi } from '../../catalogo-servicos/use-cases/catalogo-servicos.api';
-import { EstoqueApi } from '../../estoque/aplicacao/estoque.api';
+import { EstoqueApi } from '../../estoque/use-cases/estoque.api';
 import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
 import { SituacaoPecaOrcada } from '../dominio/itens';
 import { OrcadorDeItens } from './orcador-de-itens.service';

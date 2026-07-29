@@ -1,6 +1,7 @@
 import type { ExecucaoConcluida } from '../../ordem-servico/dominio/eventos';
-import { Peca } from '../dominio/peca';
-import { PecaRepository, ReservaRepository } from '../dominio/repositorios';
+import { Peca } from '../entities/peca';
+import { PecaRepository } from './peca.repositorio';
+import { ReservaRepository } from './reserva.repositorio';
 import { BaixarNaConclusao } from './baixar-na-conclusao.policy';
 
 describe('BaixarNaConclusao (política do estoque)', () => {

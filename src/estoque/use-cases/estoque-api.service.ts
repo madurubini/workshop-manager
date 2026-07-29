@@ -1,12 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ErroNaoEncontrado } from '../../compartilhado/erros/erros-dominio';
-import { FORNECEDOR, Fornecedor } from '../dominio/fornecedor';
-import {
-  COTACAO_REPOSITORY,
-  CotacaoRepository,
-  PECA_REPOSITORY,
-  PecaRepository,
-} from '../dominio/repositorios';
+import { FORNECEDOR, Fornecedor } from './fornecedor';
+import { PECA_REPOSITORY, PecaRepository } from './peca.repositorio';
+import { COTACAO_REPOSITORY, CotacaoRepository } from './cotacao.repositorio';
 import {
   DisponibilidadePeca,
   EstoqueApi,

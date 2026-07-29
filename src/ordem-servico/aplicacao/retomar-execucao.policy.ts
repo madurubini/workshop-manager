@@ -5,7 +5,7 @@ import {
   PublicadorDeEventos,
 } from '../../compartilhado/dominio/publicador-de-eventos';
 // Importação SÓ DE TIPO: o contrato do evento do Estoque, sem acoplar runtime.
-import type { PecaRecebida } from '../../estoque/dominio/eventos';
+import type { PecaRecebida } from '../../estoque/entities/eventos';
 import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,

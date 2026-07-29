@@ -1,5 +1,5 @@
 import { PublicadorDeEventos } from '../../compartilhado/dominio/publicador-de-eventos';
-import { PecaRecebida } from '../../estoque/dominio/eventos';
+import { PecaRecebida } from '../../estoque/entities/eventos';
 import { SituacaoPecaOrcada } from '../dominio/itens';
 import { OrdemServico } from '../dominio/ordem-servico';
 import { OrdemServicoRepository } from '../dominio/repositorios';

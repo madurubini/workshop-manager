@@ -1,6 +1,7 @@
-import { Fornecedor } from '../dominio/fornecedor';
-import { Peca } from '../dominio/peca';
-import { CotacaoRepository, PecaRepository } from '../dominio/repositorios';
+import { Fornecedor } from './fornecedor';
+import { Peca } from '../entities/peca';
+import { PecaRepository } from './peca.repositorio';
+import { CotacaoRepository } from './cotacao.repositorio';
 import { EstoqueApiService } from './estoque-api.service';
 
 function peca(saldoFisico: number, reservado = 0): Peca {

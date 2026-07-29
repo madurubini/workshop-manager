@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Peca as PecaPrisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { PrismaService } from '../../compartilhado/infraestrutura/prisma/prisma.service';
-import { Peca } from '../dominio/peca';
-import { PecaRepository } from '../dominio/repositorios';
+import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/prisma.service';
+import { Peca } from '../../entities/peca';
+import { PecaRepository } from '../../use-cases/peca.repositorio';
 
+/** Gateway Prisma da porta PecaRepository. */
 @Injectable()
 export class PrismaPecaRepository implements PecaRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -37,13 +38,13 @@ export class PrismaPecaRepository implements PecaRepository {
   }
 
   async buscarPorId(id: string): Promise<Peca | null> {
-    const r = await this.prisma.peca.findUnique({ where: { id } });
-    return r ? this.mapear(r) : null;
+    const registro = await this.prisma.peca.findUnique({ where: { id } });
+    return registro ? this.mapear(registro) : null;
   }
 
   async buscarPorCodigo(codigo: string): Promise<Peca | null> {
-    const r = await this.prisma.peca.findUnique({ where: { codigo } });
-    return r ? this.mapear(r) : null;
+    const registro = await this.prisma.peca.findUnique({ where: { codigo } });
+    return registro ? this.mapear(registro) : null;
   }
 
   async listar(): Promise<Peca[]> {
@@ -51,7 +52,7 @@ export class PrismaPecaRepository implements PecaRepository {
       where: { ativo: true },
       orderBy: { nome: 'asc' },
     });
-    return registros.map((r) => this.mapear(r));
+    return registros.map((registro) => this.mapear(registro));
   }
 
   async reservarAtomico(entrada: {
@@ -88,14 +89,14 @@ export class PrismaPecaRepository implements PecaRepository {
     });
   }
 
-  private mapear(r: PecaPrisma): Peca {
-    return Peca.restaurar(r.id, {
-      codigo: r.codigo,
-      nome: r.nome,
-      precoUnitario: Number(r.precoUnitario),
-      saldoFisico: r.saldoFisico,
-      reservado: r.reservado,
-      ativo: r.ativo,
+  private mapear(registro: PecaPrisma): Peca {
+    return Peca.restaurar(registro.id, {
+      codigo: registro.codigo,
+      nome: registro.nome,
+      precoUnitario: Number(registro.precoUnitario),
+      saldoFisico: registro.saldoFisico,
+      reservado: registro.reservado,
+      ativo: registro.ativo,
     });
   }
 }

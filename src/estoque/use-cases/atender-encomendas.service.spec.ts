@@ -1,10 +1,7 @@
 import { PublicadorDeEventos } from '../../compartilhado/dominio/publicador-de-eventos';
-import { PecaRecebida } from '../dominio/eventos';
-import {
-  DadosEncomenda,
-  EncomendaRepository,
-  PecaRepository,
-} from '../dominio/repositorios';
+import { PecaRecebida } from '../entities/eventos';
+import { PecaRepository } from './peca.repositorio';
+import { DadosEncomenda, EncomendaRepository } from './encomenda.repositorio';
 import { AtenderEncomendasDaPeca } from './atender-encomendas.service';
 
 function pendente(over: Partial<DadosEncomenda> = {}): DadosEncomenda {
