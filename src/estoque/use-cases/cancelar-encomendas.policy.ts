@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 // Importação SÓ DE TIPO: o contrato do evento, sem acoplar ao módulo de OS.
-import type { OSCancelada } from '../../ordem-servico/dominio/eventos';
+import type { OSCancelada } from '../../ordem-servico/entities/eventos';
 import {
   ENCOMENDA_REPOSITORY,
   EncomendaRepository,

@@ -1,4 +1,4 @@
-import type { OSCancelada } from '../../ordem-servico/dominio/eventos';
+import type { OSCancelada } from '../../ordem-servico/entities/eventos';
 import { EncomendaRepository } from './encomenda.repositorio';
 import { CancelarEncomendasNoCancelamento } from './cancelar-encomendas.policy';
 

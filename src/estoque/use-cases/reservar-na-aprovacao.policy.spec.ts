@@ -1,4 +1,4 @@
-import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
+import type { OrcamentoAprovado } from '../../ordem-servico/entities/eventos';
 import { Fornecedor } from './fornecedor';
 import { PecaRepository } from './peca.repositorio';
 import { EncomendaRepository } from './encomenda.repositorio';

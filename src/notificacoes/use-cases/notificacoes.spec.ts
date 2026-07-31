@@ -1,11 +1,11 @@
-import type { OrdemServicoConsultaApi } from '../../ordem-servico/aplicacao/ordem-servico-consulta.api';
+import type { OrdemServicoConsultaApi } from '../../ordem-servico/use-cases/ordem-servico-consulta.api';
 import type {
   ExecucaoConcluida,
   OrcamentoAprovado,
   OrcamentoEnviado,
   OrcamentoRecusado,
   VeiculoEntregue,
-} from '../../ordem-servico/dominio/eventos';
+} from '../../ordem-servico/entities/eventos';
 import { Notificador } from './notificador';
 import { NotificarCliente } from './notificar-cliente.handler';
 import { ReenviarPendentes } from './reenviar-pendentes.policy';

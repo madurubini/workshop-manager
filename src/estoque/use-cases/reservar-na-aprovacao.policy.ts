@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 // Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
-import type { OrcamentoAprovado } from '../../ordem-servico/dominio/eventos';
+import type { OrcamentoAprovado } from '../../ordem-servico/entities/eventos';
 import { FORNECEDOR, Fornecedor } from './fornecedor';
 import { PECA_REPOSITORY, PecaRepository } from './peca.repositorio';
 import {

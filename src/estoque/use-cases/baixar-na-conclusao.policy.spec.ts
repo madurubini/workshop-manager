@@ -1,4 +1,4 @@
-import type { ExecucaoConcluida } from '../../ordem-servico/dominio/eventos';
+import type { ExecucaoConcluida } from '../../ordem-servico/entities/eventos';
 import { Peca } from '../entities/peca';
 import { PecaRepository } from './peca.repositorio';
 import { ReservaRepository } from './reserva.repositorio';

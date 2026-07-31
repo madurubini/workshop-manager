@@ -3,27 +3,28 @@ import { CatalogoServicosModule } from '../catalogo-servicos/catalogo-servicos.m
 import { ClientesVeiculosModule } from '../clientes-veiculos/clientes-veiculos.module';
 import { EstoqueModule } from '../estoque/estoque.module';
 import { IdentidadeModule } from '../identidade/identidade.module';
-import { AbrirOrdemServico } from './aplicacao/abrir-ordem-servico.usecase';
-import { AprovarOrcamento } from './aplicacao/aprovar-orcamento.usecase';
-import { ConcluirExecucao } from './aplicacao/concluir-execucao.usecase';
+import { AbrirOrdemServico } from './use-cases/abrir-ordem-servico.usecase';
+import { AprovarOrcamento } from './use-cases/aprovar-orcamento.usecase';
+import { ConcluirExecucao } from './use-cases/concluir-execucao.usecase';
+import { ConsultarOrdemServico } from './use-cases/consultar-ordem-servico.usecase';
 import {
   ConfirmarPagamento,
   EntregarVeiculo,
-} from './aplicacao/entrega.usecases';
-import { IniciarDiagnostico } from './aplicacao/iniciar-diagnostico.usecase';
-import { LancarOrcamentoAdicional } from './aplicacao/lancar-orcamento-adicional.usecase';
-import { OrcadorDeItens } from './aplicacao/orcador-de-itens.service';
-import { ORDEM_SERVICO_CONSULTA } from './aplicacao/ordem-servico-consulta.api';
-import { OrdemServicoConsultaService } from './aplicacao/ordem-servico-consulta.service';
-import { RecusarOrcamento } from './aplicacao/recusar-orcamento.usecase';
-import { RegistrarDiagnostico } from './aplicacao/registrar-diagnostico.usecase';
-import { RelatorioTempoMedioExecucao } from './aplicacao/relatorio-tempo-medio.usecase';
-import { RetomarExecucaoAoReceberPeca } from './aplicacao/retomar-execucao.policy';
-import { ORDEM_SERVICO_REPOSITORY } from './dominio/repositorios';
-import { PrismaOrdemServicoRepository } from './infraestrutura/prisma-ordem-servico.repository';
-import { AcompanhamentoController } from './interfaces/acompanhamento.controller';
-import { OrdensServicoController } from './interfaces/ordens-servico.controller';
-import { RelatoriosController } from './interfaces/relatorios.controller';
+} from './use-cases/entrega.usecases';
+import { IniciarDiagnostico } from './use-cases/iniciar-diagnostico.usecase';
+import { LancarOrcamentoAdicional } from './use-cases/lancar-orcamento-adicional.usecase';
+import { OrcadorDeItens } from './use-cases/orcador-de-itens.service';
+import { ORDEM_SERVICO_CONSULTA } from './use-cases/ordem-servico-consulta.api';
+import { OrdemServicoConsultaService } from './use-cases/ordem-servico-consulta.service';
+import { ORDEM_SERVICO_REPOSITORY } from './use-cases/ordem-servico.repositorio';
+import { RecusarOrcamento } from './use-cases/recusar-orcamento.usecase';
+import { RegistrarDiagnostico } from './use-cases/registrar-diagnostico.usecase';
+import { RelatorioTempoMedioExecucao } from './use-cases/relatorio-tempo-medio.usecase';
+import { RetomarExecucaoAoReceberPeca } from './use-cases/retomar-execucao.policy';
+import { PrismaOrdemServicoRepository } from './adapters/gateways/prisma-ordem-servico.repositorio';
+import { AcompanhamentoController } from './adapters/controllers/acompanhamento.controller';
+import { OrdensServicoController } from './adapters/controllers/ordens-servico.controller';
+import { RelatoriosController } from './adapters/controllers/relatorios.controller';
 
 /**
  * Contexto Ordem de Serviço (núcleo). Importa os outros contextos apenas para
@@ -55,6 +56,7 @@ import { RelatoriosController } from './interfaces/relatorios.controller';
     LancarOrcamentoAdicional,
     ConfirmarPagamento,
     EntregarVeiculo,
+    ConsultarOrdemServico,
     RelatorioTempoMedioExecucao,
     RetomarExecucaoAoReceberPeca,
     {

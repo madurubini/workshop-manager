@@ -7,7 +7,7 @@ import type {
   OrcamentoEnviado,
   OrcamentoRecusado,
   VeiculoEntregue,
-} from '../../ordem-servico/dominio/eventos';
+} from '../../ordem-servico/entities/eventos';
 import {
   ACOMPANHAMENTO_TOKEN,
   AcompanhamentoToken,

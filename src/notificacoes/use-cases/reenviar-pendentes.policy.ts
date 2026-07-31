@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   ORDEM_SERVICO_CONSULTA,
   OrdemServicoConsultaApi,
-} from '../../ordem-servico/aplicacao/ordem-servico-consulta.api';
+} from '../../ordem-servico/use-cases/ordem-servico-consulta.api';
 import { NOTIFICADOR, Notificador } from './notificador';
 
 /**
