@@ -85,6 +85,19 @@ export class OrdensServicoController {
     return ordens.map(apresentarOrdemServico);
   }
 
+  @Get('fila')
+  @ApiOperation({
+    summary:
+      'Fila de trabalho: OS ativas ordenadas por prioridade de status ' +
+      '(Em execução > Aguardando aprovação > Em diagnóstico > Recebida) e, ' +
+      'dentro de cada status, as mais antigas primeiro. Exclui (logicamente) ' +
+      'as finalizadas, entregues e canceladas.',
+  })
+  async fila(): Promise<OrdemServicoRespostaDto[]> {
+    const ordens = await this.consulta.listarFila();
+    return ordens.map(apresentarOrdemServico);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalhe completo da OS' })
   async porId(@Param('id') id: string): Promise<OrdemServicoRespostaDto> {

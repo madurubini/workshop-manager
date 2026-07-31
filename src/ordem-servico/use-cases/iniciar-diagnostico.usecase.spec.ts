@@ -31,6 +31,7 @@ describe('IniciarDiagnostico', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
     usecase = new IniciarDiagnostico(ordens, eventos);

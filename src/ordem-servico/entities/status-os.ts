@@ -43,6 +43,25 @@ export function transicaoPermitida(de: StatusOS, para: StatusOS): boolean {
   return TRANSICOES[de].includes(para);
 }
 
+/**
+ * Fila de trabalho da oficina: prioridade de exibição por status (menor número
+ * = mais no topo). Segue o enunciado — Em execução > Aguardando aprovação >
+ * Em diagnóstico > Recebida — e coloca "Aguardando peça" (espera passiva pelo
+ * fornecedor, sem ação imediata da oficina) ao fim. Os status encerrados
+ * (Finalizada, Entregue, Cancelada) não têm prioridade: ficam FORA da fila
+ * (exclusão lógica — continuam no banco, só não aparecem na listagem).
+ */
+export const PRIORIDADE_FILA: Partial<Record<StatusOS, number>> = {
+  [StatusOS.EM_EXECUCAO]: 1,
+  [StatusOS.AGUARDANDO_APROVACAO]: 2,
+  [StatusOS.EM_DIAGNOSTICO]: 3,
+  [StatusOS.RECEBIDA]: 4,
+  [StatusOS.AGUARDANDO_PECA]: 5,
+};
+
+/** Status que compõem a fila de trabalho (os que têm prioridade definida). */
+export const STATUS_FILA = Object.keys(PRIORIDADE_FILA) as StatusOS[];
+
 /** Rótulos de exibição (como no contrato/linguagem ubíqua). */
 export const ROTULO_STATUS: Record<StatusOS, string> = {
   [StatusOS.RECEBIDA]: 'Recebida',

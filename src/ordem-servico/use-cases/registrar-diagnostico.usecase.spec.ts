@@ -44,6 +44,7 @@ describe('RegistrarDiagnostico', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     orcador = {
       orcarServicos: jest.fn().mockResolvedValue([

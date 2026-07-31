@@ -58,6 +58,7 @@ describe('ConcluirExecucao', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
     usecase = new ConcluirExecucao(ordens, eventos);

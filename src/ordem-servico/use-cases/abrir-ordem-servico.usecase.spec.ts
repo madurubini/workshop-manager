@@ -31,6 +31,7 @@ describe('AbrirOrdemServico', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn().mockResolvedValue('OS-000001'),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     clientesVeiculos = {
       clienteExiste: jest.fn(),

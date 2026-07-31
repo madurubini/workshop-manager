@@ -47,6 +47,7 @@ describe('RetomarExecucaoAoReceberPeca (política da OS)', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
     policy = new RetomarExecucaoAoReceberPeca(ordens, eventos);

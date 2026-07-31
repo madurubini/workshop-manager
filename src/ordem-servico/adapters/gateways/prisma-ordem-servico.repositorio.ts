@@ -15,7 +15,7 @@ import {
   TipoOrcamento,
 } from '../../entities/itens';
 import { OrdemServico } from '../../entities/ordem-servico';
-import { StatusOS } from '../../entities/status-os';
+import { StatusOS, STATUS_FILA } from '../../entities/status-os';
 import {
   FiltroOrdens,
   OrdemServicoRepository,
@@ -179,6 +179,15 @@ export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
       where,
       include: INCLUDE_COMPLETO,
       orderBy: { criadoEm: 'desc' },
+    });
+    return registros.map((registro) => this.mapear(registro));
+  }
+
+  async listarFila(): Promise<OrdemServico[]> {
+    const registros = await this.prisma.ordemServico.findMany({
+      where: { status: { in: STATUS_FILA } },
+      include: INCLUDE_COMPLETO,
+      orderBy: { criadoEm: 'asc' }, // mais antigas primeiro
     });
     return registros.map((registro) => this.mapear(registro));
   }

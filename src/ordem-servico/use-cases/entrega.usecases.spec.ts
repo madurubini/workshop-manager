@@ -45,6 +45,7 @@ describe('Casos de uso de entrega', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
   });

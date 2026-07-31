@@ -9,6 +9,7 @@ function repo(): jest.Mocked<OrdemServicoRepository> {
     listar: jest.fn(),
     proximoNumero: jest.fn(),
     listarTemposExecucao: jest.fn(),
+    listarFila: jest.fn(),
   };
 }
 

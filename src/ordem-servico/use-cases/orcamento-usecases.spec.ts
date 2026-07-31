@@ -53,6 +53,7 @@ describe('Casos de uso de orçamento', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     eventos = { publicar: jest.fn() };
   });

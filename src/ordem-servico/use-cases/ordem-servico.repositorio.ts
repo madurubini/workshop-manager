@@ -35,6 +35,12 @@ export interface OrdemServicoRepository {
   atualizar(ordem: OrdemServico): Promise<void>;
   buscarPorId(id: string): Promise<OrdemServico | null>;
   listar(filtro?: FiltroOrdens): Promise<OrdemServico[]>;
+  /**
+   * Fila de trabalho: só as OS ativas (status em STATUS_FILA — exclui as
+   * encerradas), já ordenadas pelas mais antigas primeiro. A ordenação por
+   * prioridade de status é aplicada no caso de uso (regra de negócio).
+   */
+  listarFila(): Promise<OrdemServico[]>;
   /** Gera o próximo número sequencial da OS (ex.: OS-000001). */
   proximoNumero(): Promise<string>;
   /** OS com execução concluída (tempos), para o relatório de tempo médio. */

@@ -76,6 +76,7 @@ describe('OrdemServicoConsultaService', () => {
       listar: jest.fn(),
       proximoNumero: jest.fn(),
       listarTemposExecucao: jest.fn(),
+      listarFila: jest.fn(),
     };
     ordens.listar.mockImplementation(async (filtro) => {
       if (filtro?.status === StatusOS.AGUARDANDO_APROVACAO) {
