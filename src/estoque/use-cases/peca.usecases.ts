@@ -82,9 +82,12 @@ export class PecaUseCases {
       `Ajuste ${entrada.tipo} de ${entrada.quantidade} na peça ${entrada.id}` +
         (entrada.motivo ? ` (motivo: ${entrada.motivo})` : ''),
     );
-    // Entrada de saldo pode liberar encomendas que aguardavam esta peça.
+    // Entrada de saldo pode liberar encomendas que aguardavam esta peça. Como a
+    // reserva é atômica no banco, releio a peça para devolver o saldo real (o
+    // objeto em memória ficaria com o `reservado` de antes do atendimento).
     if (entrada.tipo === 'ENTRADA') {
       await this.atenderEncomendas.executar(peca.id);
+      return this.buscarAtivaOuFalhar(peca.id);
     }
     return peca;
   }
