@@ -11,6 +11,34 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 - Erro padrão: `{ "erro": { "codigo", "mensagem", "detalhes" } }`.
 - Status: 200/201/204, 400 (validação), 401/403 (auth), 404, 409 (conflito), 422 (transição de status inválida).
 
+## Erros
+
+Toda falha sai no mesmo envelope — inclusive as que nascem no framework (validação de DTO) ou no
+banco. `detalhes` é sempre a chave presente: `null` quando não há o que detalhar.
+
+| Código | HTTP | Quando acontece | `detalhes` |
+|---|---|---|---|
+| `VALIDACAO` | 400 | Formato de entrada inválido (DTO/query) ou regra do caso de uso (ex.: período com início posterior ao fim). | Lista de mensagens do validador, ou o objeto do erro de domínio. |
+| `NAO_AUTENTICADO` | 401 | Sem credencial, JWT inválido/expirado, token de acompanhamento ausente ou inválido. | `null`. |
+| `NAO_AUTORIZADO` | 403 | Autenticado, mas sem permissão: papel insuficiente (`@Papeis`) ou token de acompanhamento de **outra** OS. | Papéis exigidos, quando for o caso. |
+| `NAO_ENCONTRADO` | 404 | Recurso inexistente ou inativo. | Identificador procurado. |
+| `CONFLITO` | 409 | Unicidade (documento, placa, código da peça) ou conflito de versão (optimistic lock). | Campo(s) em conflito. |
+| `TRANSICAO_INVALIDA` | 422 | Ação incompatível com o status atual da OS. | Status de origem e destino. |
+| `ERRO_INTERNO` | 500 | Falha não prevista. A causa **não** é exposta. | `{ "idDaOcorrencia": "uuid" }` — o mesmo id vai para o log, ligando a resposta ao rastro do servidor. |
+
+Violações de constraint do banco não vazam como 500: o tradutor de erros do Prisma converte
+`P2002` → `CONFLITO` (409), `P2025` → `NAO_ENCONTRADO` (404) e `P2003` → `VALIDACAO` (400). Isso
+importa em requisições concorrentes, quando a checagem prévia do caso de uso perde a corrida para
+o banco — o cliente recebe o mesmo 409 dos dois jeitos.
+
+```json
+// GET /relatorios/tempo-medio-execucao?inicio=abacaxi
+{ "erro": {
+  "codigo": "VALIDACAO",
+  "mensagem": "inicio must be a valid ISO 8601 date string",
+  "detalhes": ["inicio must be a valid ISO 8601 date string"] } }
+```
+
 ---
 
 ## Autenticação

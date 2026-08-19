@@ -251,6 +251,9 @@ o contrato comentado, em [`docs/contrato-api.md`](docs/contrato-api.md).
 ```
 
 Status: 400 (validação), 401/403 (auth), 404, 409 (conflito), 422 (transição de status inválida).
+Todo erro sai nesse envelope — inclusive os que nascem no validador ou no banco —, e um 500 traz
+`detalhes.idDaOcorrencia`, o mesmo id registrado no log. A tabela completa de códigos está em
+[`docs/contrato-api.md`](docs/contrato-api.md#erros).
 
 ---
 
