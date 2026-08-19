@@ -1,4 +1,6 @@
-# Contrato de API — Sistema de Oficina (MVP, Fase 1) — versão enxuta
+# Contrato de API — Sistema de Oficina (MVP) — versão enxuta
+
+> Reflete o código após a Fase 2 (refatoração para Clean Architecture + fila de trabalho).
 
 Princípio do corte: **comando automático não é rota.** Tudo que é disparado por política (gerar orçamento, mudar status, verificar estoque, reservar/encomendar, baixar peça, reenviar notificação, registrar tempo) acontece como efeito colateral dentro de outra ação — não vira endpoint. Sobram as ações que um ator humano realmente dispara.
 
@@ -22,7 +24,7 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 - Valida CPF/CNPJ; documento único.
 
 ## Veículos (admin) — CRUD
-- `POST /clientes/{clienteId}/veiculos` · `GET /veiculos/{id}` · `PUT /veiculos/{id}` · `DELETE /veiculos/{id}`
+- `POST /clientes/{clienteId}/veiculos` · `GET /clientes/{clienteId}/veiculos` · `GET /veiculos/{id}` · `PUT /veiculos/{id}` · `DELETE /veiculos/{id}`
 - Valida placa; placa única.
 
 ## Serviços — catálogo (admin) — CRUD
@@ -40,6 +42,7 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 |---|---|---|
 | `POST /ordens-servico` | Abre a OS (`clienteId`, `veiculoId`, `problemaRelatado`). | Status → Recebida. |
 | `GET /ordens-servico` | Lista/filtra (`?status=&clienteId=`). | — |
+| `GET /ordens-servico/fila` | **Fila de trabalho**: só as OS ativas, ordenadas por prioridade de status (Em execução > Aguardando aprovação > Em diagnóstico > Recebida) e, dentro de cada status, as mais antigas primeiro. Exclui logicamente finalizadas, entregues e canceladas. | — |
 | `GET /ordens-servico/{id}` | Detalhe completo da OS. | — |
 | `POST /ordens-servico/{id}/diagnostico/iniciar` | Mecânico inicia o diagnóstico (só o id da OS). | Status → Em diagnóstico. |
 | `POST /ordens-servico/{id}/diagnostico` | Registra serviços + peças e conclui o diagnóstico. Exige o diagnóstico já iniciado (OS em Em diagnóstico). | Verifica estoque, cota faltantes, gera **e envia** o orçamento; status → Aguardando aprovação; notifica o cliente. |
@@ -47,7 +50,7 @@ Princípio do corte: **comando automático não é rota.** Tudo que é disparado
 | `POST /ordens-servico/{id}/orcamentos-adicionais` | Lança um **orçamento adicional** durante a execução (`descricao`, `servicos`, `pecas`). | Cria um novo orçamento (tipo ADICIONAL) já enviado e notifica o cliente para autorizar. |
 | `POST /ordens-servico/{id}/pagamento` | Marca a OS como paga (pagamento manual). Corpo `{ pago: true }`. | Libera a entrega. |
 | `POST /ordens-servico/{id}/entrega` | Entrega o veículo e encerra a OS. | Status → Entregue → encerrada. Exige pagamento confirmado. |
-| `GET /relatorios/tempo-medio-execucao` | Tempo médio de execução (`?periodo=`). | — |
+| `GET /relatorios/tempo-medio-execucao` | Tempo médio de execução das OS concluídas, com recorte opcional por data (`?inicio=&fim=`, ISO-8601). | — |
 
 Exemplo do diagnóstico (a rota que mais concentra):
 ```json
@@ -55,11 +58,16 @@ Exemplo do diagnóstico (a rota que mais concentra):
 // req
 { "servicos": [ { "servicoId": "uuid", "quantidade": 1 } ],
   "pecas":    [ { "pecaId": "uuid", "quantidade": 4 } ] }
-// res 200
-{ "status": "Em diagnóstico",
-  "orcamento": { "id": "uuid", "totalServicos": 120.00, "totalPecas": 540.00, "total": 660.00 },
+// res 200 — o orçamento já sai enviado ao cliente
+{ "status": "Aguardando aprovação",
+  "orcamento": {
+    "id": "uuid", "tipo": "INICIAL", "status": "ENVIADO",
+    "totalServicos": 120.00, "totalPecas": 540.00, "total": 660.00,
+    "servicos": [ { "servicoId": "uuid", "descricao": "Troca de óleo", "quantidade": 1, "precoAplicado": 120.00 } ],
+    "pecas":    [ { "pecaId": "uuid", "descricao": "Filtro", "quantidade": 4, "precoAplicado": 135.00, "situacao": "EM_COTACAO" } ]
+  },
   "pendenciasEstoque": [ { "pecaId": "uuid", "situacao": "EM_COTACAO" } ] }
-// 422 se concluído antes de o estoque responder
+// 422 se a OS não estiver em "Em diagnóstico" (o diagnóstico precisa ser iniciado antes)
 ```
 
 ---
@@ -73,11 +81,21 @@ Exemplo do diagnóstico (a rota que mais concentra):
 
 ---
 
+---
+
+## Infraestrutura (público)
+
+| Método / Rota | O que faz |
+|---|---|
+| `GET /health` | Health check (Terminus): responde `{ "status": "ok" }` com a checagem do banco. Usado pelo Docker e pelas probes do Kubernetes. |
+
+---
+
 ## Resumo da contagem
 - 4 CRUDs administrativos (clientes, veículos, serviços, peças) — exigidos pelo enunciado.
 - 1 cadastro de usuário (`POST /usuarios`, GESTOR).
-- 9 rotas na OS (3 de leitura/criação + 6 de ação).
+- 10 rotas na OS (4 de leitura/criação — incluindo a fila — + 6 de ação).
 - 2 rotas de acompanhamento do cliente (consulta + resposta a orçamento por id).
-- 1 auth + 1 relatório.
+- 1 auth + 1 relatório + 1 health.
 
 Os comandos automáticos (reservar, encomendar, baixar, gerar orçamento, mudar status, reenviar notificação) **não** aparecem como rota: vivem dentro das ações acima, disparados por política.
