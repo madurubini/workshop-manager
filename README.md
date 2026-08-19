@@ -321,24 +321,85 @@ Para apontar o e2e a outro banco, exporte `DATABASE_URL_E2E`.
 
 ---
 
-## Arquitetura (resumo)
+## Arquitetura
 
 Monolito modular em **DDD** (NestJS + Prisma): um deploy, um banco, organizado por **contexto
-delimitado** em `src/` (`identidade`, `clientes-veiculos`, `catalogo-servicos`, `estoque`,
-`ordem-servico`, `notificacoes`, `compartilhado`). Cada módulo segue **Clean Architecture** com
-três camadas internas — `entities/` (entidades, VOs e eventos), `use-cases/` (casos de uso e as
-portas de que dependem) e `adapters/` (controllers, presenters, gateways e DTOs) —, com a regra
-de dependência apontando para dentro.
+delimitado** em `src/`. Módulos nunca importam a entidade ou o repositório um do outro — conversam
+por **porta pública** (linha cheia: resposta síncrona) ou por **evento** (linha tracejada: efeito
+posterior).
 
-Módulos se comunicam de duas formas, nunca importando a entidade ou o repositório um do outro:
-**porta pública** (interface + token) quando precisam de resposta síncrona, e **evento**
-(event bus in-process) quando é efeito posterior — é assim que aprovar um orçamento faz o estoque
-reservar e as notificações avisarem o cliente, sem que um conheça o outro.
+```mermaid
+flowchart LR
+    subgraph nucleo["Núcleo"]
+        os["<b>ordem-servico</b><br/><i>agregado OrdemServico</i>"]
+    end
+
+    subgraph suporte["Contextos de suporte"]
+        cv["clientes-veiculos"]
+        cat["catalogo-servicos"]
+        est["estoque"]
+    end
+
+    subgraph apoio["Apoio"]
+        idt["identidade<br/><i>JWT, papéis, token da OS</i>"]
+        notif["notificacoes<br/><i>reativo, sem agregado</i>"]
+    end
+
+    comp["<b>compartilhado</b> — Prisma · event bus · GeradorDeId · VOs · erros"]
+
+    os -->|"CLIENTES_VEICULOS_API"| cv
+    os -->|"CATALOGO_SERVICOS_API"| cat
+    os -->|"ESTOQUE_API"| est
+    notif -->|"ORDEM_SERVICO_CONSULTA"| os
+
+    os -.->|"orcamento-aprovado<br/>execucao-concluida<br/>os-cancelada"| est
+    os -.->|"orcamento-enviado / aprovado / recusado<br/>execucao-concluida · veiculo-entregue"| notif
+    est -.->|"peca-recebida"| os
+
+    nucleo --- comp
+    suporte --- comp
+    apoio --- comp
+
+    classDef nucleoC fill:#e3f2e8,stroke:#4a8a5f,color:#12301d
+    classDef suporteC fill:#e8f0fe,stroke:#4a6fa5,color:#1a2b47
+    classDef apoioC fill:#f4f1e8,stroke:#9a8c68,color:#3d3520
+    classDef compC fill:#f0eef6,stroke:#7a6f9b,color:#2b2440
+    class os nucleoC
+    class cv,cat,est suporteC
+    class idt,notif apoioC
+    class comp compC
+```
+
+É assim que aprovar um orçamento faz o estoque reservar as peças **e** as notificações avisarem o
+cliente, sem que um módulo conheça o outro.
+
+Dentro de cada módulo, **Clean Architecture** em três camadas, com a regra de dependência apontando
+para dentro (a quarta — Frameworks & Drivers — é global: `main.ts` e `compartilhado/infraestrutura`):
+
+```mermaid
+flowchart RL
+    ad["<b>adapters/</b><br/>controllers · presenters<br/>gateways · dtos"]
+    uc["<b>use-cases/</b><br/>casos de uso +<br/>as interfaces que eles exigem"]
+    en["<b>entities/</b><br/>entidades · VOs · eventos<br/><i>sem Nest, sem Prisma, sem HTTP</i>"]
+
+    ad --> uc --> en
+
+    classDef c1 fill:#e3f2e8,stroke:#4a8a5f,color:#12301d
+    classDef c2 fill:#e8f0fe,stroke:#4a6fa5,color:#1a2b47
+    classDef c3 fill:#f4f1e8,stroke:#9a8c68,color:#3d3520
+    class en c1
+    class uc c2
+    class ad c3
+```
+
+O ciclo de vida da OS, o fluxo ponta a ponta e o desvio de peça em falta estão desenhados em
+**[`docs/arquitetura.md`](docs/arquitetura.md)**.
 
 ## Documentação
 
 | Documento | Conteúdo |
 |---|---|
+| [`docs/arquitetura.md`](docs/arquitetura.md) | Os diagramas: contexto, módulos, camadas, ciclo de vida da OS e fluxos. |
 | [`docs/contrato-api.md`](docs/contrato-api.md) | Endpoints, payloads e o princípio "comando automático não é rota". |
 | [`docs/linguagem-ubiqua.md`](docs/linguagem-ubiqua.md) | Vocabulário do domínio (Event Storming). |
 | [`docs/schema.prisma`](docs/schema.prisma) | Cópia documental do schema de dados. |
