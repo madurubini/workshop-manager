@@ -1,12 +1,14 @@
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Inject,
   Injectable,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import {
+  ErroNaoAutenticado,
+  ErroNaoAutorizado,
+} from '../../../compartilhado/erros/erros-dominio';
 import {
   ACOMPANHAMENTO_TOKEN,
   AcompanhamentoToken,
@@ -36,18 +38,18 @@ export class AcompanhamentoGuard implements CanActivate {
       : (req.query?.token as string | undefined);
 
     if (!token) {
-      throw new UnauthorizedException('Token de acompanhamento ausente.');
+      throw new ErroNaoAutenticado('Token de acompanhamento ausente.');
     }
 
     const payload = await this.tokens.verificar(token);
     if (!payload) {
-      throw new UnauthorizedException(
+      throw new ErroNaoAutenticado(
         'Token de acompanhamento inválido ou expirado.',
       );
     }
 
     if (payload.osId !== req.params?.osId) {
-      throw new ForbiddenException('Token não corresponde a esta OS.');
+      throw new ErroNaoAutorizado('Token não corresponde a esta OS.');
     }
 
     return true;

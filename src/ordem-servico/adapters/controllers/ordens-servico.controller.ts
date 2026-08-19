@@ -9,12 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ErroValidacao } from '../../../compartilhado/erros/erros-dominio';
 import { JwtAuthGuard } from '../../../identidade/adapters/guards/jwt-auth.guard';
 import { UsuarioAtual } from '../../../identidade/adapters/decorators/usuario-atual.decorator';
@@ -29,7 +24,6 @@ import {
 import { IniciarDiagnostico } from '../../use-cases/iniciar-diagnostico.usecase';
 import { LancarOrcamentoAdicional } from '../../use-cases/lancar-orcamento-adicional.usecase';
 import { RegistrarDiagnostico } from '../../use-cases/registrar-diagnostico.usecase';
-import { StatusOS } from '../../entities/status-os';
 import {
   apresentarDiagnostico,
   apresentarOrdemServico,
@@ -37,6 +31,7 @@ import {
 import {
   AbrirOrdemServicoDto,
   DiagnosticoRespostaDto,
+  FiltrarOrdensServicoDto,
   LancarOrcamentoAdicionalDto,
   OrdemServicoRespostaDto,
   PagamentoDto,
@@ -75,13 +70,10 @@ export class OrdensServicoController {
 
   @Get()
   @ApiOperation({ summary: 'Lista/filtra ordens de serviço' })
-  @ApiQuery({ name: 'status', required: false, enum: StatusOS })
-  @ApiQuery({ name: 'clienteId', required: false })
   async listar(
-    @Query('status') status?: StatusOS,
-    @Query('clienteId') clienteId?: string,
+    @Query() filtro: FiltrarOrdensServicoDto,
   ): Promise<OrdemServicoRespostaDto[]> {
-    const ordens = await this.consulta.listar({ status, clienteId });
+    const ordens = await this.consulta.listar(filtro);
     return ordens.map(apresentarOrdemServico);
   }
 

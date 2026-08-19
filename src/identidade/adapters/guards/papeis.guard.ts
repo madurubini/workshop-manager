@@ -1,10 +1,6 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ErroNaoAutorizado } from '../../../compartilhado/erros/erros-dominio';
 import { Papel } from '../../entities/usuario';
 import { UsuarioAutenticado } from './jwt.strategy';
 import { PAPEIS_CHAVE } from '../decorators/papeis.decorator';
@@ -31,8 +27,9 @@ export class PapeisGuard implements CanActivate {
       .getRequest<{ user?: UsuarioAutenticado }>();
     const usuario = request.user;
     if (!usuario || !exigidos.includes(usuario.papel)) {
-      throw new ForbiddenException(
+      throw new ErroNaoAutorizado(
         'Acesso restrito: papel insuficiente para esta operação.',
+        { papeisExigidos: exigidos },
       );
     }
     return true;

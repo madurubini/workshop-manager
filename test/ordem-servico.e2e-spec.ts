@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { FiltroExcecaoGlobal } from '../src/compartilhado/erros/filtro-excecao-global';
+import { traduzirErroPrisma } from '../src/compartilhado/infraestrutura/prisma/erros-prisma';
 import { PrismaService } from '../src/compartilhado/infraestrutura/prisma/prisma.service';
 import {
   ACOMPANHAMENTO_TOKEN,
@@ -61,7 +62,11 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
         transform: true,
       }),
     );
-    app.useGlobalFilters(new FiltroExcecaoGlobal());
+    // Mesma fiação do main.ts: o tradutor do Prisma faz violação de constraint
+    // virar 409/404 em vez de 500.
+    app.useGlobalFilters(
+      new FiltroExcecaoGlobal({ tradutores: [traduzirErroPrisma] }),
+    );
     await app.init();
 
     prisma = app.get(PrismaService);
@@ -304,6 +309,69 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
       .expect(200);
     expect(pecaFim.body.saldoFisico).toBe(0); // 1 - 1
     expect(pecaFim.body.reservado).toBe(0);
+  }, 30000);
+
+  it('recusa entrada inválida com 400 e envelope padrão, sem chegar ao banco', async () => {
+    const http = request(app.getHttpServer());
+    const base = '/api/v1';
+    const login = await http
+      .post(`${base}/auth/login`)
+      .send({ username: 'gestor', senha: 'gestor123' })
+      .expect(200);
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+
+    // Data que não é ISO-8601: antes descia até o Prisma e virava 500.
+    const dataInvalida = await http
+      .get(`${base}/relatorios/tempo-medio-execucao?inicio=abacaxi`)
+      .set(auth)
+      .expect(400);
+    expect(dataInvalida.body.erro.codigo).toBe('VALIDACAO');
+    expect(dataInvalida.body.erro.detalhes).toEqual(expect.any(Array));
+
+    // Período coerente é regra do caso de uso (também 400).
+    const periodoInvertido = await http
+      .get(
+        `${base}/relatorios/tempo-medio-execucao?inicio=2026-06-30&fim=2026-06-01`,
+      )
+      .set(auth)
+      .expect(400);
+    expect(periodoInvertido.body.erro.codigo).toBe('VALIDACAO');
+
+    // Status fora da máquina de estados não é filtro válido.
+    await http
+      .get(`${base}/ordens-servico?status=INVENTADO`)
+      .set(auth)
+      .expect(400);
+  }, 30000);
+
+  it('cadastro duplicado responde 409 mesmo quando quem barra é o banco', async () => {
+    const http = request(app.getHttpServer());
+    const base = '/api/v1';
+    const login = await http
+      .post(`${base}/auth/login`)
+      .send({ username: 'gestor', senha: 'gestor123' })
+      .expect(200);
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+
+    const documento = '86288366757';
+    await http
+      .post(`${base}/clientes`)
+      .set(auth)
+      .send({ documento, nome: 'Carlos' })
+      .expect(201);
+
+    // Duas gravações concorrentes com o mesmo documento: a checagem prévia do
+    // caso de uso não é atômica, então uma delas chega ao banco e volta P2002 —
+    // que o tradutor converte para o mesmo 409 do caminho feliz.
+    const respostas = await Promise.all([
+      http.post(`${base}/clientes`).set(auth).send({ documento, nome: 'A' }),
+      http.post(`${base}/clientes`).set(auth).send({ documento, nome: 'B' }),
+    ]);
+
+    for (const resposta of respostas) {
+      expect(resposta.status).toBe(409);
+      expect(resposta.body.erro.codigo).toBe('CONFLITO');
+    }
   }, 30000);
 
   it('rejeita aprovar com token de acompanhamento de OUTRA OS (anti-IDOR)', async () => {

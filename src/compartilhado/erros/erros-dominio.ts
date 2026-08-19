@@ -41,3 +41,11 @@ export class ErroTransicaoInvalida extends ErroDominio {
 export class ErroNaoAutenticado extends ErroDominio {
   readonly codigo = 'NAO_AUTENTICADO';
 }
+
+/**
+ * Autenticado, mas sem permissão para a operação (HTTP 403) — papel
+ * insuficiente ou token de acompanhamento de outra OS.
+ */
+export class ErroNaoAutorizado extends ErroDominio {
+  readonly codigo = 'NAO_AUTORIZADO';
+}

@@ -6,26 +6,54 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Response } from 'express';
 import {
   ErroConflito,
   ErroDominio,
   ErroNaoAutenticado,
+  ErroNaoAutorizado,
   ErroNaoEncontrado,
   ErroTransicaoInvalida,
   ErroValidacao,
 } from './erros-dominio';
 
 /**
+ * Converte um erro de infraestrutura (ex.: violação de unicidade do Prisma) no
+ * erro de domínio equivalente, ou devolve `null` se não souber traduzi-lo.
+ *
+ * Existe para que o filtro continue **sem conhecer o Prisma**: quem conhece é o
+ * tradutor, que vive na camada de infraestrutura e entra por injeção.
+ */
+export type TradutorDeErro = (erro: unknown) => ErroDominio | null;
+
+export interface OpcoesFiltroExcecao {
+  /** Tradutores de erro de infraestrutura → erro de domínio, em ordem. */
+  tradutores?: TradutorDeErro[];
+  /** Gerador do identificador de ocorrência (injetável para testar). */
+  gerarIdDaOcorrencia?: () => string;
+}
+
+/**
  * Traduz qualquer exceção para o envelope padrão do contrato:
  * `{ erro: { codigo, mensagem, detalhes } }`.
  *
  * Mapeia os erros de domínio para os status HTTP definidos no contrato-api
- * (400 validação, 401 auth, 404, 409 conflito, 422 transição inválida).
+ * (400 validação, 401 auth, 403 autorização, 404, 409 conflito, 422 transição
+ * inválida). O que não é reconhecido vira 500 com um **id de ocorrência**: o
+ * mesmo id vai para o log e para a resposta, então o suporte liga um ao outro
+ * sem expor a stack ao cliente.
  */
 @Catch()
 export class FiltroExcecaoGlobal implements ExceptionFilter {
   private readonly logger = new Logger(FiltroExcecaoGlobal.name);
+  private readonly tradutores: TradutorDeErro[];
+  private readonly gerarIdDaOcorrencia: () => string;
+
+  constructor(opcoes: OpcoesFiltroExcecao = {}) {
+    this.tradutores = opcoes.tradutores ?? [];
+    this.gerarIdDaOcorrencia = opcoes.gerarIdDaOcorrencia ?? randomUUID;
+  }
 
   catch(excecao: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -33,12 +61,8 @@ export class FiltroExcecaoGlobal implements ExceptionFilter {
 
     const { status, codigo, mensagem, detalhes } = this.traduzir(excecao);
 
-    if (status >= 500) {
-      this.logger.error(excecao);
-    }
-
     resposta.status(status).json({
-      erro: { codigo, mensagem, detalhes },
+      erro: { codigo, mensagem, detalhes: detalhes ?? null },
     });
   }
 
@@ -48,44 +72,64 @@ export class FiltroExcecaoGlobal implements ExceptionFilter {
     mensagem: string;
     detalhes?: unknown;
   } {
-    if (excecao instanceof ErroDominio) {
+    const erroDominio =
+      excecao instanceof ErroDominio ? excecao : this.traduzirInfra(excecao);
+
+    if (erroDominio) {
       return {
-        status: this.statusDoErroDominio(excecao),
-        codigo: excecao.codigo,
-        mensagem: excecao.message,
-        detalhes: excecao.detalhes,
+        status: this.statusDoErroDominio(erroDominio),
+        codigo: erroDominio.codigo,
+        mensagem: erroDominio.message,
+        detalhes: erroDominio.detalhes,
       };
     }
 
     if (excecao instanceof HttpException) {
       const status = excecao.getStatus();
       const corpo = excecao.getResponse();
-      const mensagem =
-        typeof corpo === 'string'
-          ? corpo
-          : (((corpo as Record<string, unknown>).message as string) ??
-            excecao.message);
+      const mensagens = this.mensagensDe(corpo, excecao.message);
       return {
         status,
         codigo: this.codigoPadraoPorStatus(status),
-        mensagem: Array.isArray(mensagem) ? mensagem.join('; ') : mensagem,
-        detalhes:
-          typeof corpo === 'object'
-            ? (corpo as Record<string, unknown>).message
-            : undefined,
+        mensagem: mensagens.join('; '),
+        // Sempre a lista de mensagens: um formato só, venha do class-validator
+        // (array) ou de uma exceção com string única.
+        detalhes: mensagens,
       };
     }
 
+    // Desconhecido: 500 com id de ocorrência para casar log e resposta.
+    const idDaOcorrencia = this.gerarIdDaOcorrencia();
+    this.logger.error(`Erro não tratado [${idDaOcorrencia}]`, excecao);
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       codigo: 'ERRO_INTERNO',
       mensagem: 'Erro interno do servidor.',
+      detalhes: { idDaOcorrencia },
     };
+  }
+
+  /** Primeiro tradutor que reconhecer o erro de infraestrutura ganha. */
+  private traduzirInfra(excecao: unknown): ErroDominio | null {
+    for (const traduzir of this.tradutores) {
+      const erro = traduzir(excecao);
+      if (erro) return erro;
+    }
+    return null;
+  }
+
+  private mensagensDe(corpo: unknown, fallback: string): string[] {
+    if (typeof corpo === 'string') return [corpo];
+    const mensagem = (corpo as Record<string, unknown> | null)?.message;
+    if (Array.isArray(mensagem)) return mensagem as string[];
+    if (typeof mensagem === 'string') return [mensagem];
+    return [fallback];
   }
 
   private statusDoErroDominio(erro: ErroDominio): number {
     if (erro instanceof ErroValidacao) return HttpStatus.BAD_REQUEST;
     if (erro instanceof ErroNaoAutenticado) return HttpStatus.UNAUTHORIZED;
+    if (erro instanceof ErroNaoAutorizado) return HttpStatus.FORBIDDEN;
     if (erro instanceof ErroNaoEncontrado) return HttpStatus.NOT_FOUND;
     if (erro instanceof ErroConflito) return HttpStatus.CONFLICT;
     if (erro instanceof ErroTransicaoInvalida)

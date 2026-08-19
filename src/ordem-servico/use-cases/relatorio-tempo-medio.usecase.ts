@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
 import {
   ORDEM_SERVICO_REPOSITORY,
   OrdemServicoRepository,
@@ -36,6 +37,7 @@ export class RelatorioTempoMedioExecucao {
   ) {}
 
   async executar(periodo?: PeriodoRelatorio): Promise<RelatorioTempoMedio> {
+    this.validarPeriodo(periodo);
     const tempos = await this.ordens.listarTemposExecucao(periodo);
     if (tempos.length === 0) {
       return { totalOrdens: 0, tempoMedioMinutos: null, porServico: [] };
@@ -77,5 +79,20 @@ export class RelatorioTempoMedioExecucao {
         }))
         .sort((a, b) => a.servicoNome.localeCompare(b.servicoNome)),
     };
+  }
+
+  /**
+   * Coerência entre os dois campos — regra que nenhum dos dois sozinho garante,
+   * por isso mora no caso de uso e não no DTO. O formato de cada data já foi
+   * validado na borda (`PeriodoRelatorioDto`).
+   */
+  private validarPeriodo(periodo?: PeriodoRelatorio): void {
+    const { inicio, fim } = periodo ?? {};
+    if (inicio && fim && inicio.getTime() > fim.getTime()) {
+      throw new ErroValidacao('O início do período é posterior ao fim.', {
+        inicio: inicio.toISOString(),
+        fim: fim.toISOString(),
+      });
+    }
   }
 }

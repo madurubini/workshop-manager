@@ -1,3 +1,4 @@
+import { ErroValidacao } from '../../compartilhado/erros/erros-dominio';
 import { OrdemServicoRepository } from './ordem-servico.repositorio';
 import { RelatorioTempoMedioExecucao } from './relatorio-tempo-medio.usecase';
 
@@ -80,6 +81,31 @@ describe('RelatorioTempoMedioExecucao', () => {
       totalOrdens: 0,
       tempoMedioMinutos: null,
       porServico: [],
+    });
+  });
+
+  it('recusa período com início posterior ao fim (sem consultar o banco)', async () => {
+    const r = repo();
+
+    await expect(
+      new RelatorioTempoMedioExecucao(r).executar({
+        inicio: new Date('2026-06-30T00:00:00Z'),
+        fim: new Date('2026-06-01T00:00:00Z'),
+      }),
+    ).rejects.toBeInstanceOf(ErroValidacao);
+    expect(r.listarTemposExecucao).not.toHaveBeenCalled();
+  });
+
+  it('aceita o período com apenas um dos limites', async () => {
+    const r = repo();
+    r.listarTemposExecucao.mockResolvedValue([]);
+
+    await new RelatorioTempoMedioExecucao(r).executar({
+      inicio: new Date('2026-06-01T00:00:00Z'),
+    });
+
+    expect(r.listarTemposExecucao).toHaveBeenCalledWith({
+      inicio: new Date('2026-06-01T00:00:00Z'),
     });
   });
 });

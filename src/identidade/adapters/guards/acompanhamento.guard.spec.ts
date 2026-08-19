@@ -1,8 +1,8 @@
+import { ExecutionContext } from '@nestjs/common';
 import {
-  ExecutionContext,
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
+  ErroNaoAutenticado,
+  ErroNaoAutorizado,
+} from '../../../compartilhado/erros/erros-dominio';
 import { AcompanhamentoToken } from '../../use-cases/acompanhamento-token';
 import { AcompanhamentoGuard } from './acompanhamento.guard';
 
@@ -44,7 +44,7 @@ describe('AcompanhamentoGuard', () => {
   it('401 quando não há token', async () => {
     const ctx = contexto({ params: { osId: 'os-1' } });
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
-      UnauthorizedException,
+      ErroNaoAutenticado,
     );
   });
 
@@ -55,7 +55,7 @@ describe('AcompanhamentoGuard', () => {
       params: { osId: 'os-1' },
     });
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
-      UnauthorizedException,
+      ErroNaoAutenticado,
     );
   });
 
@@ -66,7 +66,7 @@ describe('AcompanhamentoGuard', () => {
       params: { osId: 'os-1' },
     });
     await expect(guard.canActivate(ctx)).rejects.toBeInstanceOf(
-      ForbiddenException,
+      ErroNaoAutorizado,
     );
   });
 });

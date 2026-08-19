@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { FiltroExcecaoGlobal } from './compartilhado/erros/filtro-excecao-global';
+import { traduzirErroPrisma } from './compartilhado/infraestrutura/prisma/erros-prisma';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -19,8 +20,11 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Envelope de erro padrão do contrato.
-  app.useGlobalFilters(new FiltroExcecaoGlobal());
+  // Envelope de erro padrão do contrato. O tradutor do Prisma converte violação
+  // de constraint em erro de domínio (409/404/400) em vez de deixar virar 500.
+  app.useGlobalFilters(
+    new FiltroExcecaoGlobal({ tradutores: [traduzirErroPrisma] }),
+  );
 
   // Swagger em /api/docs.
   const config = new DocumentBuilder()

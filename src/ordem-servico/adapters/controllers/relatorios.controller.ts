@@ -1,15 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../identidade/adapters/guards/jwt-auth.guard';
 import {
   RelatorioTempoMedio,
   RelatorioTempoMedioExecucao,
 } from '../../use-cases/relatorio-tempo-medio.usecase';
+import { PeriodoRelatorioDto } from '../dtos';
 
 @ApiTags('Relatórios')
 @ApiBearerAuth()
@@ -19,16 +15,16 @@ export class RelatoriosController {
   constructor(private readonly tempoMedio: RelatorioTempoMedioExecucao) {}
 
   @Get('tempo-medio-execucao')
-  @ApiOperation({ summary: 'Tempo médio de execução das OS concluídas' })
-  @ApiQuery({ name: 'inicio', required: false, description: 'ISO-8601' })
-  @ApiQuery({ name: 'fim', required: false, description: 'ISO-8601' })
+  @ApiOperation({
+    summary:
+      'Tempo médio de execução das OS concluídas, com recorte opcional por data',
+  })
   async tempoMedioExecucao(
-    @Query('inicio') inicio?: string,
-    @Query('fim') fim?: string,
+    @Query() periodo: PeriodoRelatorioDto,
   ): Promise<RelatorioTempoMedio> {
     return this.tempoMedio.executar({
-      inicio: inicio ? new Date(inicio) : undefined,
-      fim: fim ? new Date(fim) : undefined,
+      inicio: periodo.inicio ? new Date(periodo.inicio) : undefined,
+      fim: periodo.fim ? new Date(periodo.fim) : undefined,
     });
   }
 }

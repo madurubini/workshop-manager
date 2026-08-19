@@ -1,9 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -12,6 +14,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { SituacaoPecaOrcada } from '../entities/itens';
+import { StatusOS } from '../entities/status-os';
 
 export class AbrirOrdemServicoDto {
   @ApiProperty({ format: 'uuid' })
@@ -170,8 +173,43 @@ export class PagamentoDto {
 
 /** Resposta do diagnóstico no formato do contrato (usa o orçamento inicial). */
 export class DiagnosticoRespostaDto {
-  @ApiProperty({ example: 'Em diagnóstico' }) status!: string;
+  @ApiProperty({ example: 'Aguardando aprovação' }) status!: string;
   @ApiProperty({ type: OrcamentoDto }) orcamento!: OrcamentoDto;
   @ApiProperty({ type: [PendenciaEstoqueDto] })
   pendenciasEstoque!: PendenciaEstoqueDto[];
+}
+
+/**
+ * Filtros da listagem de OS. Validados como DTO para que um status inexistente
+ * ou um id malformado virem 400 aqui, em vez de descerem até o banco.
+ */
+export class FiltrarOrdensServicoDto {
+  @ApiPropertyOptional({ enum: StatusOS })
+  @IsOptional()
+  @IsEnum(StatusOS)
+  status?: StatusOS;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  clienteId?: string;
+}
+
+/** Recorte opcional por data de conclusão nos relatórios. */
+export class PeriodoRelatorioDto {
+  @ApiPropertyOptional({
+    example: '2026-01-01',
+    description: 'Início do período (ISO-8601)',
+  })
+  @IsOptional()
+  @IsISO8601()
+  inicio?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-01-31',
+    description: 'Fim do período (ISO-8601)',
+  })
+  @IsOptional()
+  @IsISO8601()
+  fim?: string;
 }
