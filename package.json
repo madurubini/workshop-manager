@@ -85,8 +85,9 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/dominio/**/*.ts",
-      "**/aplicacao/**/*.ts"
+      "**/entities/**/*.ts",
+      "**/use-cases/**/*.ts",
+      "**/dominio/**/*.ts"
     ],
     "coveragePathIgnorePatterns": [
       "\\.module\\.ts$",

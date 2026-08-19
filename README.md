@@ -146,5 +146,8 @@ exige um Postgres acessível e usa um banco dedicado (`oficina_e2e`).
 
 Monolito modular em **DDD** (NestJS + Prisma): um deploy, um banco, organizado por **contexto
 delimitado** em `src/` (`identidade`, `clientes-veiculos`, `catalogo-servicos`, `estoque`,
-`ordem-servico`, `notificacoes`, `compartilhado`). Cada módulo tem as camadas `dominio`,
-`aplicacao`, `infraestrutura` e `interfaces`. Detalhes do domínio e do contrato em `docs/`.
+`ordem-servico`, `notificacoes`, `compartilhado`). Cada módulo segue **Clean Architecture** com
+três camadas internas — `entities/` (entidades, VOs e eventos), `use-cases/` (casos de uso e as
+portas de que dependem) e `adapters/` (controllers, presenters, gateways e DTOs) —, com a regra
+de dependência apontando para dentro. Detalhes do domínio e do contrato em `docs/`; as decisões
+da refatoração em `docs/fase2/`.
