@@ -9,7 +9,7 @@ import { PrismaService } from '../src/compartilhado/infraestrutura/prisma/prisma
 import {
   ACOMPANHAMENTO_TOKEN,
   AcompanhamentoToken,
-} from '../src/identidade/dominio/portas';
+} from '../src/identidade/use-cases/acompanhamento-token';
 
 /**
  * E2E de INTEGRAÇÃO do fluxo da OS — sobe o AppModule inteiro contra um Postgres
@@ -135,7 +135,12 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
     const osId = os.body.id;
     expect(os.body.status).toBe('Recebida');
 
-    // 4. Diagnóstico → orçamento inicial (preço congelado)
+    // 4. Diagnóstico: o mecânico assume a OS e registra os itens (o orçamento
+    // inicial já sai enviado ao cliente na conclusão do diagnóstico).
+    await http
+      .post(`${base}/ordens-servico/${osId}/diagnostico/iniciar`)
+      .set(auth)
+      .expect(200);
     const diag = await http
       .post(`${base}/ordens-servico/${osId}/diagnostico`)
       .set(auth)
@@ -147,13 +152,7 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
     const orcamentoId = diag.body.orcamento.id;
     expect(diag.body.orcamento.total).toBe(190); // 120 + 2*35
 
-    // 5. Enviar orçamento
-    await http
-      .post(`${base}/ordens-servico/${osId}/orcamento/enviar`)
-      .set(auth)
-      .expect(200);
-
-    // 6. Cliente aprova via TOKEN DE ACOMPANHAMENTO (sem login de operador)
+    // 5. Cliente aprova via TOKEN DE ACOMPANHAMENTO (sem login de operador)
     const acomp = app.get<AcompanhamentoToken>(ACOMPANHAMENTO_TOKEN);
     const tokenCliente = await acomp.gerar(osId);
     const aprov = await http
@@ -163,14 +162,14 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
       .expect(200);
     expect(aprov.body.status).toBe('Em execução');
 
-    // 7. Reserva refletida no estoque (reservado subiu)
+    // 6. Reserva refletida no estoque (reservado subiu)
     const pecaResv = await http
       .get(`${base}/pecas/${PECA_ID}`)
       .set(auth)
       .expect(200);
     expect(pecaResv.body.reservado).toBe(2);
 
-    // 8. Concluir execução → baixa
+    // 7. Concluir execução → baixa
     const concl = await http
       .post(`${base}/ordens-servico/${osId}/execucao/concluir`)
       .set(auth)
@@ -184,7 +183,7 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
     expect(pecaBaixa.body.saldoFisico).toBe(8); // 10 - 2
     expect(pecaBaixa.body.reservado).toBe(0);
 
-    // 9. Pagamento + entrega
+    // 8. Pagamento + entrega
     await http
       .post(`${base}/ordens-servico/${osId}/pagamento`)
       .set(auth)
@@ -233,6 +232,10 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
     const osId = os.body.id;
 
     // Diagnóstico com a peça SEM saldo → linha EM_COTACAO (preço cotado)
+    await http
+      .post(`${base}/ordens-servico/${osId}/diagnostico/iniciar`)
+      .set(auth)
+      .expect(200);
     const diag = await http
       .post(`${base}/ordens-servico/${osId}/diagnostico`)
       .set(auth)
@@ -247,11 +250,7 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
     );
     expect(pecaOrcada.situacao).toBe('EM_COTACAO');
 
-    // Enviar e aprovar (token de acompanhamento)
-    await http
-      .post(`${base}/ordens-servico/${osId}/orcamento/enviar`)
-      .set(auth)
-      .expect(200);
+    // Aprovar (token de acompanhamento)
     const acomp = app.get<AcompanhamentoToken>(ACOMPANHAMENTO_TOKEN);
     const tokenCliente = await acomp.gerar(osId);
     const aprov = await http
@@ -335,14 +334,14 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
         problemaRelatado: 'Revisão',
       })
       .expect(201);
+    await http
+      .post(`${base}/ordens-servico/${os.body.id}/diagnostico/iniciar`)
+      .set(auth)
+      .expect(200);
     const diag = await http
       .post(`${base}/ordens-servico/${os.body.id}/diagnostico`)
       .set(auth)
       .send({ servicos: [{ servicoId: SERVICO_ID, quantidade: 1 }] })
-      .expect(200);
-    await http
-      .post(`${base}/ordens-servico/${os.body.id}/orcamento/enviar`)
-      .set(auth)
       .expect(200);
 
     // Token de OUTRA OS (id aleatório) → 403

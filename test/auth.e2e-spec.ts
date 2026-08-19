@@ -1,14 +1,30 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  Global,
+  INestApplication,
+  Module,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { FiltroExcecaoGlobal } from '../src/compartilhado/erros/filtro-excecao-global';
 import { IdentidadeModule } from '../src/identidade/identidade.module';
-import {
-  HASH_DE_SENHA,
-  USUARIO_REPOSITORY,
-} from '../src/identidade/dominio/portas';
-import { Usuario } from '../src/identidade/dominio/usuario';
+import { HASH_DE_SENHA } from '../src/identidade/use-cases/hash-de-senha';
+import { USUARIO_REPOSITORY } from '../src/identidade/use-cases/usuario.repositorio';
+import { Usuario } from '../src/identidade/entities/usuario';
+import { GERADOR_DE_ID } from '../src/compartilhado/dominio/gerador-de-id';
+
+/**
+ * Na aplicação, a porta GERADOR_DE_ID é provida pelo CompartilhadoModule, que é
+ * @Global. Como aqui o IdentidadeModule é montado isolado (sem Prisma), o fake
+ * entra por um módulo global equivalente — e ainda deixa o id previsível.
+ */
+@Global()
+@Module({
+  providers: [{ provide: GERADOR_DE_ID, useValue: { novo: () => 'uuid-1' } }],
+  exports: [GERADOR_DE_ID],
+})
+class GeradorDeIdFakeModule {}
 
 /**
  * E2E do fluxo de autenticação. Substitui o repositório (Prisma) e o hash
@@ -31,7 +47,11 @@ describe('Auth (e2e)', () => {
     process.env.JWT_EXPIRES_IN = '3600s';
 
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule.forRoot({ isGlobal: true }), IdentidadeModule],
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true }),
+        GeradorDeIdFakeModule,
+        IdentidadeModule,
+      ],
     })
       .overrideProvider(USUARIO_REPOSITORY)
       .useValue({
