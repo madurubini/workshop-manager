@@ -9,6 +9,22 @@ entrega), controle de **estoque de peças** e acompanhamento do cliente por link
 
 ---
 
+## Entregáveis da Fase 2
+
+| Item | Onde |
+|---|---|
+| Descrição da solução e objetivos desta fase | [Objetivos](#objetivos) |
+| Desenho da arquitetura — componentes da aplicação | [Arquitetura](#arquitetura) |
+| Desenho da arquitetura — infraestrutura provisionada | [Componentes](#componentes) |
+| Desenho da arquitetura — fluxo de deploy | [Fluxo de deploy](#fluxo-de-deploy) |
+| Instruções de execução local | [Rodando localmente](#rodando-localmente) |
+| Instruções de deploy em Kubernetes | [Deploy no Kubernetes](#deploy-no-kubernetes) |
+| Instruções de provisionamento com Terraform | [Provisionamento com Terraform](#provisionamento-com-terraform) |
+| Collection completa das APIs | [Collection das APIs](#collection-das-apis) |
+| Vídeo demonstrativo | [Vídeo demonstrativo](#vídeo-demonstrativo) |
+
+---
+
 ## Objetivos
 
 Digitalizar o atendimento de uma oficina mecânica, do recebimento do veículo à entrega,
@@ -42,56 +58,133 @@ Na **Fase 2**, a mesma aplicação ganha a infraestrutura que a sustenta em esca
 
 ## Rodando localmente
 
-API e banco sobem com um comando, sem precisar de Node na máquina.
+O ambiente completo — API e Postgres — sobe com **um comando**. Não é preciso Node,
+Postgres nem nada além do Docker na máquina.
 
 ### Pré-requisitos
 
 | | |
 |---|---|
-| **Obrigatório** | Docker Engine com o plugin `docker compose` (v2). Só isso. |
-| Opcional | `jq`, só para os exemplos de `curl` deste README ficarem legíveis. |
+| **Obrigatório** | Docker Engine com o plugin `docker compose` (v2) |
+| Opcional | `jq`, só para deixar legíveis os exemplos de `curl` deste README |
 
----
+Confirme antes de começar:
 
-### Docker (app + Postgres com um comando)
+```bash
+docker --version           # Docker version 28.x
+docker compose version     # Docker Compose version v2.x
+```
+
+### Passo 1 — Clonar o repositório
+
+```bash
+git clone git@github.com:madurubini/workshop-manager.git
+cd workshop-manager
+```
+
+### Passo 2 — Subir o ambiente
 
 ```bash
 docker compose up --build          # em segundo plano: docker compose up --build -d
 ```
 
-O que acontece no start (script `docker-entrypoint.sh`):
+O primeiro build leva alguns minutos (instala dependências e compila). Nas vezes seguintes o
+Docker reaproveita o cache e sobe em segundos.
 
-1. `prisma migrate deploy` — aplica as migrations versionadas em `prisma/migrations/`;
-2. `node dist/prisma/seed.js` — roda o seed (idempotente: pode subir quantas vezes quiser);
-3. `node dist/main` — sobe a API.
+Três coisas acontecem no start, nesta ordem (script `docker-entrypoint.sh`):
 
-Está pronto quando aparecer `Nest application successfully started`. Confira:
+1. **`prisma migrate deploy`** — cria as tabelas a partir de `prisma/migrations/`;
+2. **`node dist/prisma/seed.js`** — popula usuário, serviços e peças de exemplo. É idempotente:
+   pode subir quantas vezes quiser sem duplicar nada;
+3. **`node dist/main`** — sobe a API.
+
+Está pronto quando aparecer no log:
+
+```
+Nest application successfully started
+API ouvindo em http://localhost:3000/api/v1
+Swagger em http://localhost:3000/api/docs
+```
+
+### Passo 3 — Conferir que está no ar
 
 ```bash
+docker compose ps
+# oficina-app e oficina-db devem estar "Up" e "(healthy)"
+
 curl http://localhost:3000/api/v1/health
-# → {"status":"ok","info":{"database":{"status":"up"}}, ...}
+# {"status":"ok","info":{"database":{"status":"up"}}, ...}
 ```
+
+`"database":"up"` é a prova de que a API alcançou o Postgres.
+
+### Passo 4 — Fazer login
+
+O seed criou um usuário administrativo:
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{ "username": "gestor", "senha": "gestor123" }'
+# { "accessToken": "eyJhbGciOi...", "expiresIn": 3600 }
+```
+
+Guarde o token para as chamadas autenticadas:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{ "username": "gestor", "senha": "gestor123" }' | jq -r .accessToken)
+```
+
+Daqui, siga para o [Passeio de 2 minutos](#passeio-de-2-minutos-fluxo-completo-via-curl),
+que percorre uma OS do recebimento à entrega — ou abra o Swagger e explore pela interface.
+
+### Onde fica cada coisa
 
 | Recurso | Endereço |
 |---|---|
 | API | http://localhost:3000/api/v1 |
-| Swagger (collection navegável) | http://localhost:3000/api/docs |
-| OpenAPI JSON (importável no Postman/Insomnia) | http://localhost:3000/api/docs-json |
+| Swagger | http://localhost:3000/api/docs |
+| OpenAPI JSON | http://localhost:3000/api/docs-json |
 | Health check | http://localhost:3000/api/v1/health |
 | Postgres (no host) | `localhost:5433` — usuário `oficina`, senha `oficina`, banco `oficina` |
 
-Comandos do dia a dia:
+> A porta **5433** é usada de propósito no host, porque a 5432 costuma estar ocupada por outro
+> Postgres. Dentro da rede do compose a API fala com o banco em `db:5432`.
+
+### Comandos do dia a dia
 
 ```bash
 docker compose logs -f app     # acompanhar os logs da API
 docker compose ps              # estado dos containers e health
 docker compose restart app     # reiniciar só a API
-docker compose down            # parar tudo (mantém os dados no volume)
+docker compose down            # parar tudo, mantendo os dados no volume
 docker compose down -v         # parar e APAGAR o banco (volume oficina-pgdata)
 ```
 
-> A porta **5433** é usada de propósito no host (a 5432 costuma estar ocupada por outro Postgres).
-> Dentro da rede do compose a API fala com o banco em `db:5432`.
+Para recomeçar do zero, com o banco limpo:
+
+```bash
+docker compose down -v && docker compose up --build
+```
+
+### Configuração
+
+Os valores usados pelo compose têm padrões de desenvolvimento e podem ser sobrescritos por um
+arquivo `.env` na raiz — use o [`.env.example`](.env.example) como base:
+
+```bash
+cp .env.example .env
+```
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `oficina` | Credenciais do Postgres |
+| `POSTGRES_PORT` | `5433` | Porta do banco no host |
+| `APP_PORT` | `3000` | Porta da API no host |
+| `JWT_SECRET` | segredo de desenvolvimento | Assinatura dos tokens |
+| `JWT_EXPIRES_IN` | `3600s` | Validade do token |
 
 ---
 
@@ -600,6 +693,53 @@ cluster do CI é descartável e some ao fim da execução.
 > Manager, Vault) via External Secrets Operator, e o `tfstate` — que guarda os valores em
 > texto puro — ficaria num backend remoto com criptografia e controle de acesso, não em disco.
 
+### Provisionamento com Terraform
+
+O `infra/` provisiona a **plataforma**: namespace, Secrets e o banco de dados. É o passo 2 do
+deploy acima, detalhado — os recursos criados estão documentados em
+[`infra/README.md`](infra/README.md).
+
+```bash
+cd infra
+
+# 1. Baixa o provider e prepara o backend local. Roda uma vez.
+terraform init
+
+# 2. Opcional: personalize senha, tamanho do volume, namespace.
+cp terraform.tfvars.example terraform.tfvars     # não é versionado
+$EDITOR terraform.tfvars
+
+# 3. Mostra o que será criado, sem criar nada.
+terraform plan                                    # "Plan: 5 to add"
+
+# 4. Cria. Só termina quando o Postgres aceita conexão (wait_for_rollout).
+terraform apply
+
+# 5. Consulta as saídas.
+terraform output
+terraform output -raw database_url                # valores sensíveis exigem -raw
+```
+
+O que é criado:
+
+| Recurso | Nome | Papel |
+|---|---|---|
+| `kubernetes_namespace` | `oficina` | Isola os objetos da aplicação no cluster |
+| `kubernetes_secret` | `oficina-secrets` | `DATABASE_URL` e `JWT_SECRET` para a API |
+| `kubernetes_secret` | `oficina-db-credenciais` | Usuário, senha e banco para o Postgres |
+| `kubernetes_stateful_set` | `oficina-db` | Postgres 16, com volume que sobrevive ao pod |
+| `kubernetes_service` | `oficina-db` | Service headless: publica o banco no DNS interno |
+
+Para remover:
+
+```bash
+cd infra && terraform destroy
+```
+
+> ⚠️ O `destroy` apaga o volume e, com ele, **os dados do banco**.
+
+---
+
 ### Escalabilidade automática
 
 ```bash
@@ -657,6 +797,50 @@ Decisões menores, pelo mesmo raciocínio:
 | **Secrets no Terraform** | Mantém credencial fora do repositório: o valor vem de variável, não de YAML versionado |
 | **`imagePullPolicy: IfNotPresent`** | A imagem é carregada no cluster, não vem de registry; com `Always` o Kubernetes tentaria baixá-la e falharia |
 | **Build no daemon do Minikube** | Com uma tag fixa, `minikube image load` mantém a imagem antiga em cache e o cluster segue servindo a versão anterior |
+
+## Collection das APIs
+
+A collection completa é o **Swagger** publicado pela própria aplicação — gerado a partir dos
+decoradores nos controllers, então nunca fica defasado em relação ao código.
+
+| | Local | Kubernetes |
+|---|---|---|
+| Swagger UI | http://localhost:3000/api/docs | `http://$(minikube ip):30080/api/docs` |
+| OpenAPI JSON | http://localhost:3000/api/docs-json | `http://$(minikube ip):30080/api/docs-json` |
+
+Pelo Swagger dá para autenticar e disparar as chamadas sem sair do navegador:
+
+1. `POST /auth/login` com `gestor` / `gestor123` → copie o `accessToken`;
+2. clique em **Authorize**, cole o token e confirme;
+3. as rotas administrativas passam a responder. As de `/acompanhamento` são públicas e usam o
+   token da OS.
+
+Para usar no **Postman** ou **Insomnia**, importe o OpenAPI JSON — os dois leem o formato
+direto pela URL:
+
+```bash
+# ou baixe o arquivo e importe por "File"
+curl -s http://localhost:3000/api/docs-json -o oficina-openapi.json
+```
+
+O contrato também está descrito em [`docs/contrato-api.md`](docs/contrato-api.md), com os
+payloads e o princípio "comando automático não é rota".
+
+---
+
+## Vídeo demonstrativo
+
+🔗 **[Link do vídeo]** — *a preencher*
+
+Demonstra, no ambiente em execução:
+
+- **Deploy da aplicação** — `terraform apply` provisionando a plataforma e os manifestos
+  aplicados no cluster;
+- **Execução do CI/CD** — a pipeline no GitHub Actions, com build, testes, imagem e deploy;
+- **Consumo das APIs** — a jornada da OS pelo Swagger, do recebimento à entrega;
+- **Escalabilidade automática** — carga gerada no cluster e o HPA subindo as réplicas.
+
+---
 
 ## Documentação
 
