@@ -36,3 +36,10 @@ prisma/*.db
 .claude/worktrees/
 .claude/settings.local.json
 CLAUDE.md
+
+# Terraform (estado, plugins e variáveis com segredos — nada disso vai ao git)
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan
