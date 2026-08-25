@@ -8,15 +8,9 @@ import {
 import { PrismaService } from '../compartilhado/infraestrutura/prisma/prisma.service';
 
 /**
- * Sondas de saúde da aplicação (públicas). São três, porque o orquestrador faz
- * duas perguntas diferentes e uma resposta só não serve para as duas:
- *
- * - `/health/live`   (liveness)  — "o processo está vivo?". Se falhar, o pod é
- *   REINICIADO. Por isso não toca no banco: uma instabilidade do Postgres não
- *   pode derrubar em cascata réplicas que estão perfeitamente sadias.
- * - `/health/ready`  (readiness) — "posso mandar tráfego?". Se falhar, o pod só
- *   sai do balanceamento até se recuperar. Aqui sim o banco é verificado.
- * - `/health`        — sonda completa, mantida para o Docker Compose e o README.
+ * Sondas de saúde (públicas). A liveness não consulta o banco de propósito: ela
+ * reinicia o pod, e uma queda do Postgres derrubaria réplicas sadias em cascata.
+ * Quem verifica o banco é a readiness, que só tira o pod do balanceamento.
  */
 @ApiTags('Saúde')
 @Controller('health')

@@ -34,14 +34,12 @@ COPY prisma ./prisma
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
-# A imagem node:20-slim já traz o usuário sem privilégios "node". O processo roda
-# como ele; node_modules continua pertencendo ao root, então a aplicação não
-# consegue reescrever as próprias dependências em tempo de execução.
+# node_modules continua pertencendo ao root: a aplicação não reescreve as
+# próprias dependências em tempo de execução.
 USER node
 
 EXPOSE 3000
 
-# A imagem só inicia a API. Migrar o banco é responsabilidade de quem orquestra:
-# no Compose, do docker-entrypoint.sh; no Kubernetes, do Job de migrations
-# (várias réplicas subindo juntas não podem migrar o banco ao mesmo tempo).
+# Só inicia a API. Migrar o banco é de quem orquestra: docker-entrypoint.sh no
+# Compose, Job de migrations no Kubernetes.
 CMD ["node", "dist/main"]

@@ -1,7 +1,3 @@
-# Variáveis são as entradas do módulo: mudam o resultado sem mudar o código.
-# Os valores vêm de terraform.tfvars, de -var na linha de comando ou das
-# variáveis de ambiente TF_VAR_*.
-
 variable "kubeconfig_path" {
   description = "Caminho do kubeconfig usado para falar com o cluster."
   type        = string
@@ -29,9 +25,8 @@ variable "banco_usuario" {
 variable "banco_senha" {
   description = "Senha do Postgres."
   type        = string
-  # sensitive esconde o valor da saída do plan/apply e dos logs.
-  sensitive = true
-  default   = "oficina"
+  sensitive   = true
+  default     = "oficina"
 }
 
 variable "banco_nome" {

@@ -1,9 +1,4 @@
-# HorizontalPodAutoscaler observa o consumo dos pods e ajusta o número de
-# réplicas do Deployment sozinho — "horizontal" porque cria mais cópias, em vez
-# de dar mais CPU/memória para as existentes (isso seria vertical).
-#
-# Depende do metrics-server para ler o consumo:
-#   minikube addons enable metrics-server
+# Exige o metrics-server: minikube addons enable metrics-server
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -20,8 +15,7 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-    # "60% de utilização" significa 60% do requests.cpu declarado no Deployment
-    # (100m), ou seja, 60m de consumo médio por pod dispara o crescimento.
+    # Percentual do requests declarado no Deployment (60% de 100m = 60m por pod).
     - type: Resource
       resource:
         name: cpu
@@ -36,14 +30,13 @@ spec:
           averageUtilization: 75
   behavior:
     scaleUp:
-      # Reage rápido ao pico: sem janela de espera antes de crescer.
       stabilizationWindowSeconds: 0
       policies:
         - type: Percent
-          value: 100 # pode dobrar o número de pods
+          value: 100
           periodSeconds: 15
+    # Descer devagar evita oscilar o número de réplicas a cada pico curto.
     scaleDown:
-      # Desce devagar: espera 2 min de calmaria para evitar ficar oscilando.
       stabilizationWindowSeconds: 120
       policies:
         - type: Percent

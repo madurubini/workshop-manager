@@ -29,8 +29,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # A imagem só inicia a API (CMD). No desenvolvimento local o entrypoint
-    # aplica as migrations e o seed antes — no Kubernetes quem faz isso é o Job.
+    # Aplica migrations e seed antes de iniciar a API (no Kubernetes, é um Job).
     entrypoint: ['./docker-entrypoint.sh']
     environment:
       DATABASE_URL: 'postgresql://${POSTGRES_USER:-oficina}:${POSTGRES_PASSWORD:-oficina}@db:5432/${POSTGRES_DB:-oficina}?schema=public'

@@ -1,7 +1,5 @@
-# Atalhos do ambiente local. Os comandos completos estão no README — este
-# arquivo existe para a demonstração não virar uma sequência de linhas longas.
-#
-#   make ajuda      lista os alvos disponíveis
+# Atalhos do ambiente local. Os comandos completos estão no README.
+#   make ajuda
 
 SHELL := /bin/bash
 NAMESPACE ?= oficina
@@ -20,13 +18,12 @@ infra: ## Provisiona namespace, Secrets e Postgres com Terraform
 	cd infra && terraform init -input=false && terraform apply -input=false -auto-approve
 
 imagem: ## Constrói a imagem DENTRO do daemon do Minikube
-	# Buildar no daemon do cluster evita transferir a imagem e o cache de tag
-	# antiga que o `minikube image load` deixa quando a tag já existe.
+	# Buildar no daemon do cluster dispensa registry e evita o cache de tag antiga
+	# que o `minikube image load` deixa quando a tag já existe.
 	eval $$(minikube docker-env) && docker build -t $(IMAGEM) .
 
 manifestos: ## Aplica os manifestos da aplicação
-	# O Job é recriado: campos de um Job concluído são imutáveis, então um
-	# `apply` por cima falharia.
+	# O Job é recriado porque os campos de um Job concluído são imutáveis.
 	kubectl delete job migracoes -n $(NAMESPACE) --ignore-not-found
 	kubectl apply -f k8s/configmap.yaml -f k8s/job-migracoes.yaml \
 	              -f k8s/deployment.yaml -f k8s/service.yaml -f k8s/hpa.yaml

@@ -1,6 +1,3 @@
-# Outputs são o "retorno" do código: valores úteis depois do apply, que outras
-# ferramentas (ou você) podem consultar com `terraform output`.
-
 output "namespace" {
   description = "Namespace provisionado."
   value       = kubernetes_namespace.oficina.metadata[0].name
@@ -17,11 +14,9 @@ output "secret_aplicacao" {
 }
 
 output "database_url" {
-  description = "String de conexão da aplicação."
+  description = "String de conexão da aplicação. Para ver: terraform output -raw database_url"
   value       = local.database_url
-  # Sem isto o Terraform imprimiria a senha no terminal ao fim do apply.
-  # Para ver o valor de propósito: terraform output -raw database_url
-  sensitive = true
+  sensitive   = true
 }
 
 output "proximo_passo" {

@@ -1,9 +1,5 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Módulo: Postgres no cluster (StatefulSet + volume persistente + Service)
-#
-# Um módulo agrupa recursos que sempre andam juntos e podem ser reaproveitados
-# com parâmetros diferentes (ex.: um banco de homologação e outro de produção).
-# ─────────────────────────────────────────────────────────────────────────────
+# Postgres no cluster: StatefulSet (e não Deployment) porque banco tem estado —
+# nome de pod estável e volume próprio que sobrevive ao pod.
 
 locals {
   labels = merge(var.labels, {
@@ -12,9 +8,6 @@ locals {
   })
 }
 
-# Credenciais que a própria imagem do Postgres lê para criar o banco no
-# primeiro boot. Ficam separadas do Secret da aplicação de propósito: quem
-# administra o banco não precisa ver o segredo do JWT, e vice-versa.
 resource "kubernetes_secret" "credenciais" {
   metadata {
     name      = "${var.nome}-credenciais"
@@ -31,10 +24,7 @@ resource "kubernetes_secret" "credenciais" {
   type = "Opaque"
 }
 
-# Service headless (cluster_ip = "None"): não cria IP virtual nem balanceia,
-# só publica o nome no DNS interno apontando direto para o pod. É o
-# recomendado para StatefulSet, em que cada réplica tem identidade própria e
-# você quer falar com uma específica — não com "qualquer uma".
+# Headless: publica o nome no DNS interno apontando direto para o pod.
 resource "kubernetes_service" "banco" {
   metadata {
     name      = var.nome
@@ -57,10 +47,6 @@ resource "kubernetes_service" "banco" {
   }
 }
 
-# StatefulSet, e não Deployment, porque banco de dados tem estado:
-#   - o pod ganha nome estável (oficina-db-0), que sobrevive a reinícios;
-#   - cada réplica recebe SEU volume, criado pelo volume_claim_template;
-#   - o volume NÃO é apagado quando o pod morre — os dados persistem.
 resource "kubernetes_stateful_set" "banco" {
   metadata {
     name      = var.nome
@@ -99,9 +85,8 @@ resource "kubernetes_stateful_set" "banco" {
             }
           }
 
-          # O Postgres cria os arquivos em um subdiretório do volume montado:
-          # o ponto de montagem raiz de um PVC costuma trazer um lost+found,
-          # e o initdb exige diretório vazio.
+          # Subdiretório do volume: o initdb exige diretório vazio, e o ponto de
+          # montagem do PVC costuma trazer um lost+found.
           env {
             name  = "PGDATA"
             value = "/var/lib/postgresql/data/pgdata"
@@ -112,8 +97,6 @@ resource "kubernetes_stateful_set" "banco" {
             mount_path = "/var/lib/postgresql/data"
           }
 
-          # pg_isready responde se o banco aceita conexões. Enquanto não
-          # responder, o Service não encaminha tráfego para este pod.
           readiness_probe {
             exec {
               command = ["pg_isready", "-U", var.usuario, "-d", var.banco]
@@ -146,8 +129,6 @@ resource "kubernetes_stateful_set" "banco" {
       }
     }
 
-    # Molde do volume: o Kubernetes cria um PersistentVolumeClaim por réplica.
-    # No Minikube o storage-provisioner atende esse pedido automaticamente.
     volume_claim_template {
       metadata {
         name = "dados"
@@ -165,7 +146,7 @@ resource "kubernetes_stateful_set" "banco" {
     }
   }
 
-  # O StatefulSet só é considerado pronto quando o pod passa na readiness —
-  # assim o `terraform apply` só termina com o banco de fato aceitando conexão.
+  # O apply só termina com o banco aceitando conexão, então o Job de migrations
+  # nunca corre antes da hora.
   wait_for_rollout = true
 }

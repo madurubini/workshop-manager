@@ -1,6 +1,3 @@
-# ConfigMap guarda configuração NÃO sensível em pares chave/valor. O Deployment
-# injeta tudo isto como variáveis de ambiente (envFrom), então mudar um valor
-# aqui e reiniciar o pod muda a configuração sem rebuildar a imagem.
 apiVersion: v1
 kind: ConfigMap
 metadata:

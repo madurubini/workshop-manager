@@ -1,6 +1,3 @@
-# Deployment mantém N cópias (réplicas) da API no ar e sabe substituir uma que
-# morra ou atualizar todas sem downtime (rolling update). É o objeto que o HPA
-# manipula quando decide escalar.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,14 +9,13 @@ metadata:
 spec:
   replicas: 2
   selector:
-    # Como o Deployment reconhece "seus" pods: pelo rótulo abaixo.
     matchLabels:
       app.kubernetes.io/name: oficina-api
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0 # nunca reduz abaixo do desejado durante o deploy
-      maxSurge: 1 # sobe um pod novo por vez
+      maxUnavailable: 0
+      maxSurge: 1
   template:
     metadata:
       labels:
@@ -28,6 +24,7 @@ spec:
       containers:
         - name: api
           image: oficina-api:local
+          # A imagem é carregada no cluster (make imagem), não vem de registry.
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -37,46 +34,38 @@ spec:
                 name: oficina-config
             - secretRef:
                 name: oficina-secrets
-          # ── Probes ──────────────────────────────────────────────────────
-          # startup: dá tempo para o Nest subir sem que as outras probes o
-          # matem antes da hora (30 x 2s = até 60s de tolerância no boot).
           startupProbe:
             httpGet:
               path: /api/v1/health/live
               port: http
             periodSeconds: 2
             failureThreshold: 30
-          # liveness: se falhar, o pod é REINICIADO. Não consulta o banco.
+          # Liveness reinicia o pod, por isso não consulta o banco: uma queda do
+          # Postgres reiniciaria réplicas sadias em cascata. A readiness, que só
+          # tira do balanceamento, é quem verifica.
           livenessProbe:
             httpGet:
               path: /api/v1/health/live
               port: http
             periodSeconds: 10
             failureThreshold: 3
-          # readiness: se falhar, o pod sai do balanceamento do Service até
-          # se recuperar. Aqui sim o banco é verificado.
           readinessProbe:
             httpGet:
               path: /api/v1/health/ready
               port: http
             periodSeconds: 10
             failureThreshold: 3
-          # ── Recursos ────────────────────────────────────────────────────
-          # requests é o que o pod reserva no nó; limits é o teto.
-          # O HPA calcula o uso como percentual do REQUEST — sem requests
-          # declarados o autoscaler fica em <unknown> e nunca escala.
+          # requests é o denominador do HPA — sem ele o autoscaler fica em <unknown>.
           resources:
             requests:
-              cpu: 100m # 0,1 de um núcleo
+              cpu: 100m
               memory: 192Mi
             limits:
               cpu: 500m
               memory: 512Mi
           securityContext:
-            # O kubelet precisa do UID NUMÉRICO para provar que o usuário não é
-            # root: `USER node` no Dockerfile é só um nome, e a verificação
-            # falha com "image has non-numeric user". 1000 é o uid do usuário
-            # "node" na imagem oficial do Node.
+            # uid numérico: com `USER node` (nome) o kubelet não consegue
+            # verificar runAsNonRoot e recusa o pod.
             runAsNonRoot: true
             runAsUser: 1000
             runAsGroup: 1000
