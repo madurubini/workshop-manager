@@ -634,6 +634,14 @@ criptografia** — a proteção real vem de quem tem permissão de lê-los no cl
 encoding. O ganho concreto aqui é outro: **credencial nenhuma fica escrita em arquivo
 versionado**.
 
+> **Por que o Secret não é um YAML aplicado em `k8s/`.** Um Secret em YAML versionado
+> carregaria a senha do banco e o segredo do JWT em texto no repositório — exatamente o que
+> um Secret existe para evitar. Por isso ele é **provisionado como código, pelo Terraform**,
+> que recebe os valores por variável (`sensitive`) e os injeta no cluster. O arquivo
+> [`k8s/secret.example.yaml`](k8s/secret.example.yaml) documenta o formato esperado pelo
+> Deployment, e o `envFrom: secretRef` em [`k8s/deployment.yaml`](k8s/deployment.yaml)
+> mostra o consumo. É a mesma prática de `.env.example`: versiona-se o formato, nunca o valor.
+
 Existem dois Secrets, com públicos diferentes:
 
 | Secret | Chaves | Quem consome |
@@ -742,10 +750,22 @@ cd infra && terraform destroy
 
 ### Escalabilidade automática
 
+Em dois terminais:
+
 ```bash
-make carga                              # gera carga na API
-watch kubectl get hpa,pods -n oficina   # acompanhe as réplicas subindo
-make sem-carga                          # remove a carga; o HPA volta ao mínimo
+# terminal 1 — acompanha o HPA e as réplicas ao vivo
+watch -n 2 kubectl get hpa,pods -n oficina
+
+# terminal 2 — dispara a carga e, depois, remove
+make carga
+make sem-carga
+```
+
+Para ver o HPA registrando a decisão:
+
+```bash
+kubectl describe hpa oficina-api -n oficina | tail -8
+# Normal  SuccessfulRescale  ...  New size: 5; reason: cpu resource utilization above target
 ```
 
 Comportamento observado: com carga, o consumo passa de 60% do `requests.cpu` e o HPA vai de
