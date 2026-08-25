@@ -42,23 +42,18 @@ Na **Fase 2**, a mesma aplicação ganha a infraestrutura que a sustenta em esca
 
 ## Rodando localmente
 
-Há dois caminhos. O **A (Docker)** é o recomendado — sobe API e banco com um comando e não exige
-Node na máquina. O **B (Node na máquina)** é o de desenvolvimento, com hot reload.
+API e banco sobem com um comando, sem precisar de Node na máquina.
 
 ### Pré-requisitos
 
-| Caminho | O que precisa |
+| | |
 |---|---|
-| **A — Docker** | Docker Engine com o plugin `docker compose` (v2). Só isso. |
-| **B — Node local** | **Node 20+** (o `package.json` exige `engines.node >= 20`) e um Postgres acessível — o do compose serve. |
+| **Obrigatório** | Docker Engine com o plugin `docker compose` (v2). Só isso. |
 | Opcional | `jq`, só para os exemplos de `curl` deste README ficarem legíveis. |
-
-> ⚠️ **VPN ligada bloqueia o acesso do host aos containers.** Se `curl localhost:3000` ou a conexão
-> com o Postgres na 5433 travar sem responder, desligue a VPN e tente de novo.
 
 ---
 
-### Caminho A — Docker (app + Postgres com um comando)
+### Docker (app + Postgres com um comando)
 
 ```bash
 docker compose up --build          # em segundo plano: docker compose up --build -d
@@ -97,57 +92,6 @@ docker compose down -v         # parar e APAGAR o banco (volume oficina-pgdata)
 
 > A porta **5433** é usada de propósito no host (a 5432 costuma estar ocupada por outro Postgres).
 > Dentro da rede do compose a API fala com o banco em `db:5432`.
-
----
-
-### Caminho B — Node na máquina (hot reload)
-
-**1. Node 20.** Com nvm:
-
-```bash
-nvm use 20        # ou: export PATH="$HOME/.nvm/versions/node/v20.19.5/bin:$PATH"
-node -v           # precisa ser >= 20
-```
-
-**2. Dependências e variáveis de ambiente:**
-
-```bash
-npm install
-cp .env.example .env
-```
-
-O `.env.example` já aponta para o Postgres do compose (`localhost:5433`) — se você usa outro
-banco, ajuste `DATABASE_URL`.
-
-| Variável | Padrão do `.env.example` | Para que serve |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://oficina:oficina@localhost:5433/oficina?schema=public` | Conexão do Prisma. |
-| `PORT` | `3000` | Porta HTTP da API. |
-| `NODE_ENV` | `development` | Ambiente da aplicação. |
-| `JWT_SECRET` | `troque-este-segredo-em-producao` | Assinatura dos tokens (JWT de operador e token de acompanhamento). |
-| `JWT_EXPIRES_IN` | `3600s` | Validade do token. |
-
-**3. Suba só o banco** (a API vai rodar fora do Docker):
-
-```bash
-docker compose up -d db
-```
-
-**4. Prepare o schema e os dados de exemplo:**
-
-```bash
-npm run prisma:generate   # gera o Prisma Client (rode sempre que mudar prisma/schema.prisma)
-npm run prisma:deploy     # aplica as migrations no banco
-npm run seed              # usuário gestor + 2 serviços + 2 peças
-```
-
-**5. Suba a API em watch:**
-
-```bash
-npm run start:dev
-# API ouvindo em http://localhost:3000/api/v1
-# Swagger em http://localhost:3000/api/docs
-```
 
 ---
 
@@ -230,8 +174,7 @@ curl -s -X POST $API/ordens-servico/$OS/entrega -H "$AUTH" | jq -r .status      
 ```
 
 > Sem o `Authorization` do passo 6 a resposta é `401 NAO_AUTENTICADO` ("Token de acompanhamento
-> ausente") — a consulta é pública, mas **aprovar/recusar não é**. Rodando pelo caminho B (sem
-> Docker), pegue o token no log do `npm run start:dev` em vez do `docker compose logs`.
+> ausente") — a consulta é pública, mas **aprovar/recusar não é**.
 >
 > Para ver o desvio de **peça em falta**, refaça o passo 4 usando a peça `44444444-4444-4444-8444-444444444444`
 > (saldo zero no seed): a aprovação leva a OS para *Aguardando peça*, e um
@@ -298,6 +241,8 @@ as de `/acompanhamento` usam o **token da OS** (devolvido na notificação ao cl
 
 ## Testes
 
+Rodar a suíte exige **Node 20+** na máquina (o `package.json` pede `engines.node >= 20`).
+
 ```bash
 npm test          # unitários (entities + use-cases) — sem banco, sem HTTP
 npm run test:cov  # com cobertura (threshold GLOBAL de 80%)
@@ -317,20 +262,6 @@ npm run test:e2e
 Para apontar o e2e a outro banco, exporte `DATABASE_URL_E2E` — é assim que a pipeline faz: o job
 de qualidade sobe um Postgres como *service container* do GitHub Actions e aponta essa variável
 para ele.
-
----
-
-## Problemas comuns
-
-| Sintoma | Causa provável / solução |
-|---|---|
-| `curl localhost:3000` trava sem resposta | **VPN ligada** — o host não alcança o container. Desligue a VPN. |
-| `Can't reach database server at localhost:5433` | O container `db` não subiu (`docker compose ps`) ou a porta está tomada por outro Postgres. |
-| `port is already allocated` na 3000/5433 | Outro processo usa a porta: pare-o ou mude o mapeamento em `docker-compose.yml`. |
-| Erro de tipo do `@prisma/client` após mexer no schema | Rode `npm run prisma:generate` antes do build/teste. |
-| `test:e2e` falha em `database "oficina_e2e" does not exist` | Crie o banco (ver seção Testes). |
-| `npm ci` reclama da versão do Node | Use Node 20+ (`nvm use 20`). |
-| Banco com dados estranhos depois de experimentos | `docker compose down -v && docker compose up --build` recria tudo do zero. |
 
 ---
 
