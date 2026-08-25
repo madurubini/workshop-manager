@@ -1,6 +1,5 @@
 import { EventoDominio } from '../../compartilhado/dominio/evento-dominio';
 
-/** Cliente criado no sistema (CMD "Cadastrar cliente"). */
 export class ClienteCadastrado extends EventoDominio {
   constructor(
     readonly clienteId: string,
@@ -13,7 +12,6 @@ export class ClienteCadastrado extends EventoDominio {
   }
 }
 
-/** Veículo criado e vinculado a um cliente (EV "Veículo registrado"). */
 export class VeiculoRegistrado extends EventoDominio {
   constructor(
     readonly veiculoId: string,

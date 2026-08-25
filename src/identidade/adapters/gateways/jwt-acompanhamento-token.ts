@@ -13,10 +13,9 @@ interface PayloadAcompanhamento {
 }
 
 /**
- * Adaptador @nestjs/jwt da porta AcompanhamentoToken. Assina um JWT curto com
- * `{ osId, escopo }`. Reusa o JWT_SECRET (poderia ser um segredo próprio para
- * hardening). O `escopo` impede que um token de login de operador seja aceito
- * aqui — e vice-versa.
+ * JWT curto com `{ osId, escopo }`. O escopo impede que um token de login de
+ * operador seja aceito aqui, e vice-versa. Reusa o JWT_SECRET — um segredo
+ * próprio seria mais seguro.
  */
 @Injectable()
 export class JwtAcompanhamentoToken implements AcompanhamentoToken {
@@ -26,7 +25,7 @@ export class JwtAcompanhamentoToken implements AcompanhamentoToken {
   ) {}
 
   async gerar(osId: string): Promise<string> {
-    // expiresIn é uma duração (ex.: '7d'); o @nestjs/jwt v11 exige o tipo do `ms`.
+    // expiresIn é duração ('7d'); o @nestjs/jwt v11 exige o tipo do `ms`.
     const expiresIn = this.config.get<string>(
       'ACOMPANHAMENTO_TOKEN_EXPIRES_IN',
       '7d',
@@ -42,7 +41,6 @@ export class JwtAcompanhamentoToken implements AcompanhamentoToken {
       }
       return { osId: payload.osId };
     } catch {
-      // Token inválido, adulterado ou expirado.
       return null;
     }
   }

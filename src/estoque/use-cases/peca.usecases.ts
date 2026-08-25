@@ -32,10 +32,8 @@ export interface EntradaAjusteEstoque {
 }
 
 /**
- * Casos de uso do agregado Peça (CRUD + ajuste de saldo). As invariantes de
- * saldo/reserva moram na entidade Peca; aqui ficam as regras que cruzam o
- * repositório (código único) e o efeito de atender encomendas quando entra
- * saldo.
+ * As invariantes de saldo moram na entidade; aqui ficam o código único e o
+ * atendimento de encomendas quando entra saldo.
  */
 @Injectable()
 export class PecaUseCases {
@@ -82,9 +80,8 @@ export class PecaUseCases {
       `Ajuste ${entrada.tipo} de ${entrada.quantidade} na peça ${entrada.id}` +
         (entrada.motivo ? ` (motivo: ${entrada.motivo})` : ''),
     );
-    // Entrada de saldo pode liberar encomendas que aguardavam esta peça. Como a
-    // reserva é atômica no banco, releio a peça para devolver o saldo real (o
-    // objeto em memória ficaria com o `reservado` de antes do atendimento).
+    // A entrada pode liberar encomendas. A reserva acontece no banco, então
+    // releio a peça: o objeto em memória tem o `reservado` de antes.
     if (entrada.tipo === 'ENTRADA') {
       await this.atenderEncomendas.executar(peca.id);
       return this.buscarAtivaOuFalhar(peca.id);

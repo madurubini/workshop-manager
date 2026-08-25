@@ -13,7 +13,6 @@ export interface PeriodoRelatorio {
   fim?: Date;
 }
 
-/** Serviço (do catálogo) efetivamente executado numa OS. */
 export interface ServicoExecutado {
   id: string;
   nome: string;
@@ -22,27 +21,20 @@ export interface ServicoExecutado {
 export interface TempoExecucao {
   iniciadoExecucaoEm: Date;
   finalizadoEm: Date;
-  /** Serviços distintos dos orçamentos APROVADOS — base do tempo por tipo. */
   servicos: ServicoExecutado[];
 }
 
 export interface OrdemServicoRepository {
   inserir(ordem: OrdemServico): Promise<void>;
-  /**
-   * Persiste uma OS já existente com optimistic lock: usa a versão carregada
-   * para detectar escrita concorrente. Lança ErroConflito se a versão mudou.
-   */
+  /** Optimistic lock pela versão carregada: lança ErroConflito se ela mudou. */
   atualizar(ordem: OrdemServico): Promise<void>;
   buscarPorId(id: string): Promise<OrdemServico | null>;
   listar(filtro?: FiltroOrdens): Promise<OrdemServico[]>;
   /**
-   * Fila de trabalho: só as OS ativas (status em STATUS_FILA — exclui as
-   * encerradas), já ordenadas pelas mais antigas primeiro. A ordenação por
-   * prioridade de status é aplicada no caso de uso (regra de negócio).
+   * Só as OS ativas, mais antigas primeiro. A prioridade por status é regra de
+   * negócio e fica no caso de uso.
    */
   listarFila(): Promise<OrdemServico[]>;
-  /** Gera o próximo número sequencial da OS (ex.: OS-000001). */
   proximoNumero(): Promise<string>;
-  /** OS com execução concluída (tempos), para o relatório de tempo médio. */
   listarTemposExecucao(periodo?: PeriodoRelatorio): Promise<TempoExecucao[]>;
 }

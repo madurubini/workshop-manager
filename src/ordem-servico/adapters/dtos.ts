@@ -123,7 +123,6 @@ class PendenciaEstoqueDto {
   @ApiProperty({ enum: SituacaoPecaOrcada }) situacao!: SituacaoPecaOrcada;
 }
 
-/** Visão pública do cliente: status, orçamentos e histórico (sem dados internos). */
 export class AcompanhamentoRespostaDto {
   @ApiProperty() numero!: string;
   @ApiProperty() problemaRelatado!: string;
@@ -171,7 +170,6 @@ export class PagamentoDto {
   pago!: boolean;
 }
 
-/** Resposta do diagnóstico no formato do contrato (usa o orçamento inicial). */
 export class DiagnosticoRespostaDto {
   @ApiProperty({ example: 'Aguardando aprovação' }) status!: string;
   @ApiProperty({ type: OrcamentoDto }) orcamento!: OrcamentoDto;
@@ -195,7 +193,6 @@ export class FiltrarOrdensServicoDto {
   clienteId?: string;
 }
 
-/** Recorte opcional por data de conclusão nos relatórios. */
 export class PeriodoRelatorioDto {
   @ApiPropertyOptional({
     example: '2026-01-01',

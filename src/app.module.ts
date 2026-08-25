@@ -12,12 +12,8 @@ import { EstoqueModule } from './estoque/estoque.module';
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
 
 /**
- * Composição raiz do monolito modular. Cada contexto delimitado entra como
- * um módulo. O event bus in-process (@nestjs/event-emitter) é registrado aqui
- * e será usado pelas políticas entre módulos a partir da Fase 3.
- *
- * Todos os contextos delimitados estão registrados aqui. O ScheduleModule
- * habilita o reenvio periódico de notificações (cliente sem resposta).
+ * Composição raiz: um módulo por contexto delimitado. O ScheduleModule
+ * habilita o reenvio periódico de notificações.
  */
 @Module({
   imports: [

@@ -11,12 +11,9 @@ import {
 } from './encomenda.repositorio';
 
 /**
- * Quando uma peça dá ENTRADA no estoque, atende as encomendas PENDENTE daquela
- * peça (FIFO). Para cada uma, tenta a reserva ATÔMICA do total: se houver saldo,
- * reserva, marca a encomenda RECEBIDA e publica `estoque.peca-recebida` para a
- * OS retomar a execução. Se o saldo não cobre a próxima encomenda da fila, para
- * (ela continua PENDENTE até chegar mais peça). Não é rota: é efeito disparado
- * pela própria entrada de saldo.
+ * Efeito da entrada de saldo, não rota: atende as encomendas pendentes da peça
+ * em FIFO. Cada uma reserva o total ou nada; quando o saldo não cobre a
+ * próxima da fila, para — ela segue PENDENTE até chegar mais peça.
  */
 @Injectable()
 export class AtenderEncomendasDaPeca {

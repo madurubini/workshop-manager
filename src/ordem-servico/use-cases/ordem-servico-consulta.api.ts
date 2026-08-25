@@ -17,9 +17,7 @@ export interface OrcamentoAdicionalAguardando {
 }
 
 export interface OrdemServicoConsultaApi {
-  /** OS no estado "Aguardando aprovação" (cliente ainda não respondeu). */
   listarAguardandoResposta(): Promise<OrdemAguardando[]>;
-  /** Orçamentos adicionais aguardando autorização do cliente. */
   listarOrcamentosAdicionaisAguardando(): Promise<
     OrcamentoAdicionalAguardando[]
   >;

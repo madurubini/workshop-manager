@@ -8,10 +8,6 @@ import {
   OrdemServicoRepository,
 } from './ordem-servico.repositorio';
 
-/**
- * Casos de uso de consulta (leitura) da OS usados pelos controllers — para que
- * a apresentação nunca fale direto com o repositório.
- */
 @Injectable()
 export class ConsultarOrdemServico {
   constructor(
@@ -24,10 +20,9 @@ export class ConsultarOrdemServico {
   }
 
   /**
-   * Fila de trabalho da oficina. O repositório traz só as OS ativas já
-   * ordenadas por data (mais antigas primeiro); aqui aplicamos a prioridade
-   * por status. O sort do JS é estável, então dentro do mesmo status a ordem
-   * por data é preservada.
+   * O repositório já traz as ativas por data; aqui entra a prioridade por
+   * status. O sort é estável, então a ordem por data sobrevive dentro do
+   * mesmo status.
    */
   async listarFila(): Promise<OrdemServico[]> {
     const ordens = await this.ordens.listarFila();

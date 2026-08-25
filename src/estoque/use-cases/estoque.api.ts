@@ -1,11 +1,4 @@
-/**
- * Porta pública do Estoque (open-host service). Dois serviços usados pelo
- * diagnóstico:
- *  - verificarDisponibilidade: SOMENTE LEITURA. Não reserva nada — só informa
- *    o que há disponível para montar o orçamento.
- *  - solicitarCotacao: para peça em falta, pede preço/prazo ao fornecedor e
- *    registra a cotação (cotação ≠ compra).
- */
+/** Porta pública do Estoque, usada pelo diagnóstico. */
 export const ESTOQUE_API = Symbol('EstoqueApi');
 
 export interface DisponibilidadePeca {

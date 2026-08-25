@@ -6,7 +6,6 @@ import {
   DadosCotacao,
 } from '../../use-cases/cotacao.repositorio';
 
-/** Gateway Prisma da porta CotacaoRepository. */
 @Injectable()
 export class PrismaCotacaoRepository implements CotacaoRepository {
   constructor(private readonly prisma: PrismaService) {}

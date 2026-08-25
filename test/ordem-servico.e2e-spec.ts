@@ -13,16 +13,12 @@ import {
 } from '../src/identidade/use-cases/acompanhamento-token';
 
 /**
- * E2E de INTEGRAÇÃO do fluxo da OS — sobe o AppModule inteiro contra um Postgres
- * REAL e exercita o ciclo por HTTP (sem mocks): abrir → diagnóstico → orçamento
- * → aprovação (token de acompanhamento) → reserva → conclusão → baixa →
+ * Sobe o AppModule contra um Postgres real e percorre o ciclo por HTTP, sem
+ * mocks: abrir → diagnóstico → aprovação → reserva → conclusão → baixa →
  * pagamento → entrega.
  *
- * Usa um banco DEDICADO (DATABASE_URL_E2E, ou um `oficina_e2e` local) e o reseta
- * a cada execução — nunca toca no banco principal.
- *
- * Pré-requisito: um Postgres acessível. Com o compose: `docker compose up -d db`
- * e um banco vazio `oficina_e2e` (ex.: `createdb` ou `CREATE DATABASE`).
+ * Exige um banco dedicado (DATABASE_URL_E2E ou um `oficina_e2e` local), que é
+ * resetado a cada execução — o banco principal nunca é tocado.
  */
 const E2E_DB =
   process.env.DATABASE_URL_E2E ??
@@ -62,8 +58,7 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
         transform: true,
       }),
     );
-    // Mesma fiação do main.ts: o tradutor do Prisma faz violação de constraint
-    // virar 409/404 em vez de 500.
+    // Mesma fiação do main.ts: sem o tradutor, violação de constraint vira 500.
     app.useGlobalFilters(
       new FiltroExcecaoGlobal({ tradutores: [traduzirErroPrisma] }),
     );

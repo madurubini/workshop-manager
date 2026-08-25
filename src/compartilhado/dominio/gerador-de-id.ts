@@ -8,6 +8,5 @@
 export const GERADOR_DE_ID = Symbol('GeradorDeId');
 
 export interface GeradorDeId {
-  /** Gera um novo identificador único. */
   novo(): string;
 }

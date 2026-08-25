@@ -8,7 +8,6 @@ import {
   OrdemServicoRespostaDto,
 } from '../dtos';
 
-/** Traduz um orçamento (entidade interna da OS) para o DTO de resposta. */
 function apresentarOrcamento(orcamento: Orcamento): OrcamentoDto {
   return {
     id: orcamento.id,
@@ -34,7 +33,7 @@ function apresentarOrcamento(orcamento: Orcamento): OrcamentoDto {
   };
 }
 
-/** Presenter completo da OS (visão administrativa). */
+/** Visão administrativa (a pública é apresentarAcompanhamento). */
 export function apresentarOrdemServico(
   ordem: OrdemServico,
 ): OrdemServicoRespostaDto {
@@ -76,7 +75,7 @@ export function apresentarAcompanhamento(
   };
 }
 
-/** Resposta do diagnóstico (usa o orçamento inicial). */
+/** Usa o orçamento inicial. */
 export function apresentarDiagnostico(
   ordem: OrdemServico,
 ): DiagnosticoRespostaDto {

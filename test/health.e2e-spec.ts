@@ -6,15 +6,11 @@ import { CompartilhadoModule } from '../src/compartilhado/compartilhado.module';
 import { PrismaService } from '../src/compartilhado/infraestrutura/prisma/prisma.service';
 import { HealthModule } from '../src/health/health.module';
 
-/**
- * E2E do health check. Substitui o PrismaService por um fake para exercitar os
- * dois caminhos da sonda — banco respondendo (200/up) e banco fora (503/down) —
- * sem depender de um Postgres real.
- */
+/** Usa um PrismaService falso para exercitar os dois caminhos sem banco real. */
 describe('Health (e2e)', () => {
   let app: INestApplication;
-  // O terminus tenta $runCommandRaw (Mongo) e, ao ver o erro do provider SQL,
-  // cai para $queryRawUnsafe('SELECT 1') — reproduzimos esse caminho do Postgres.
+  // O terminus tenta $runCommandRaw (Mongo) e, ao falhar, cai para
+  // $queryRawUnsafe('SELECT 1') — é esse caminho que reproduzimos.
   const prismaFake = {
     $runCommandRaw: jest
       .fn()
@@ -75,8 +71,7 @@ describe('Health (e2e)', () => {
       .expect(200);
 
     expect(res.body.status).toBe('ok');
-    // A liveness não pode depender do banco: se dependesse, uma queda do
-    // Postgres faria o Kubernetes reiniciar réplicas sadias em cascata.
+    // Se dependesse do banco, uma queda do Postgres reiniciaria réplicas sadias.
     expect(prismaFake.$queryRawUnsafe).not.toHaveBeenCalled();
   });
 

@@ -52,15 +52,11 @@ interface PropsOrdemServico {
 }
 
 /**
- * Raiz de agregado Ordem de Serviço — núcleo do sistema. Carrega o ciclo de
- * vida inteiro (do recebimento à entrega) e é a guardiã da máquina de estados:
- * toda mudança de status passa por `transicionarPara`, que rejeita transições
- * inválidas e grava o histórico.
+ * Raiz de agregado. Toda mudança de status passa por `transicionarPara`.
  *
- * Uma OS tem vários orçamentos: um INICIAL (do diagnóstico) e zero ou mais
- * ADICIONAL (reparos descobertos na execução). Aprovar/recusar o INICIAL move o
- * status da OS; os ADICIONAL apenas liberam (ou não) o trabalho extra, sem
- * mudar o status. A OS só finaliza quando NENHUM orçamento está pendente.
+ * Uma OS tem um orçamento INICIAL (do diagnóstico) e zero ou mais ADICIONAL.
+ * Aprovar/recusar o INICIAL move o status; os ADICIONAL só liberam o trabalho
+ * extra. A OS só finaliza quando nenhum orçamento está pendente.
  */
 export class OrdemServico extends AgregadoRaiz<string> {
   private constructor(
@@ -70,7 +66,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
     super(id);
   }
 
-  /** Abre uma nova OS no estado Recebida (CMD "Abrir OS"). */
   static abrir(entrada: {
     id: string;
     numero: string;
@@ -104,16 +99,14 @@ export class OrdemServico extends AgregadoRaiz<string> {
     return os;
   }
 
-  /** Reconstrói a OS a partir do que está persistido (sem eventos). */
   static restaurar(id: string, props: PropsOrdemServico): OrdemServico {
     return new OrdemServico(id, props);
   }
 
   /**
-   * Transição de status protegida pela máquina de estados. Rejeita transições
-   * fora da ordem válida, grava o histórico e registra o evento. O início real
-   * da execução (`iniciadoExecucaoEm`) é marcado aqui, no momento em que a OS
-   * entra em Em execução — seja direto da aprovação ou após a peça chegar.
+   * Rejeita transições fora da ordem válida, grava o histórico e o evento.
+   * `iniciadoExecucaoEm` é marcado aqui — venha da aprovação ou da peça que
+   * chegou.
    */
   transicionarPara(novo: StatusOS, por?: string | null): void {
     if (!transicaoPermitida(this.props.status, novo)) {
@@ -137,21 +130,14 @@ export class OrdemServico extends AgregadoRaiz<string> {
     }
   }
 
-  /**
-   * Inicia o diagnóstico: leva a OS de Recebida para Em diagnóstico, antes de
-   * registrar serviços e peças. É o mecânico assumindo a OS para diagnosticar.
-   * A máquina de estados rejeita (HTTP 422) se a OS não estiver em Recebida.
-   */
+  /** O mecânico assume a OS: Recebida → Em diagnóstico. */
   iniciarDiagnostico(por?: string | null): void {
     this.transicionarPara(StatusOS.EM_DIAGNOSTICO, por);
   }
 
   /**
-   * Conclui o diagnóstico: cria o orçamento INICIAL (com as linhas já
-   * precificadas pela aplicação — preços congelados), já enviado ao cliente, e
-   * leva a OS de Em diagnóstico para Aguardando aprovação. Exige que o
-   * diagnóstico já tenha sido iniciado (OS em Em diagnóstico); caso contrário,
-   * rejeita (HTTP 422).
+   * Cria o orçamento INICIAL com os preços já congelados pela aplicação e o
+   * envia ao cliente: Em diagnóstico → Aguardando aprovação.
    */
   registrarDiagnostico(entrada: {
     servicos: ServicoOrcado[];
@@ -214,13 +200,12 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
 
   /**
-   * Cliente APROVA um orçamento (inicial ou adicional). Marca as peças daquele
-   * orçamento (DISPONIVEL → RESERVADA, EM_COTACAO → ENCOMENDADA) e emite o
-   * evento com a situação ORIGINAL, para o Estoque reservar/encomendar.
-   * Se for o INICIAL, leva a OS para Em execução — ou para Aguardando peça,
-   * quando alguma peça precisou ser encomendada (a execução só começa quando a
-   * peça chega). Se for ADICIONAL, a OS continua em execução (só libera o
-   * trabalho extra); a finalização é que ficará barrada até a peça chegar.
+   * Marca as peças (DISPONIVEL → RESERVADA, EM_COTACAO → ENCOMENDADA) e emite
+   * o evento com a situação ORIGINAL, que é o que o Estoque precisa saber.
+   *
+   * INICIAL leva a OS para Em execução, ou Aguardando peça se algo foi
+   * encomendado. ADICIONAL não mexe no status — mas barra a finalização até a
+   * peça chegar.
    */
   aprovarOrcamento(orcamentoId: string, por?: string | null): void {
     const orcamento = this.orcamentoNoEstado(
@@ -251,10 +236,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
     );
   }
 
-  /**
-   * Cliente RECUSA um orçamento. INICIAL → OS Cancelada; ADICIONAL → apenas
-   * marca recusado (o trabalho extra não é feito) e a OS segue em execução.
-   */
+  /** INICIAL recusado cancela a OS; ADICIONAL só dispensa o trabalho extra. */
   recusarOrcamento(
     orcamentoId: string,
     justificativa?: string | null,
@@ -281,11 +263,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
     );
   }
 
-  /**
-   * Lança um orçamento ADICIONAL durante a execução (o antigo "reparo
-   * adicional"). Nasce já ENVIADO, aguardando o cliente. A OS continua Em
-   * execução. As linhas já vêm com preço congelado pela aplicação.
-   */
+  /** Reparo descoberto na execução. Nasce ENVIADO; a OS segue Em execução. */
   adicionarOrcamentoAdicional(entrada: {
     id: string;
     descricao: string;
@@ -341,10 +319,8 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
 
   /**
-   * Estoque avisa que uma peça encomendada chegou e foi reservada para esta OS.
-   * Marca as linhas ENCOMENDADA daquela peça (nos orçamentos aprovados) como
-   * RESERVADA e, se a OS estava Aguardando peça e não resta mais nenhuma peça
-   * encomendada, retoma a execução. Idempotente: peça já reservada não faz nada.
+   * A peça encomendada chegou: marca as linhas como RESERVADA e retoma a
+   * execução se não restar nenhuma pendente. Idempotente.
    */
   registrarRecebimentoDePeca(pecaId: string, por?: string | null): void {
     let alterou = false;
@@ -378,10 +354,8 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
 
   /**
-   * Mecânico conclui a execução. Bloqueia se houver orçamento aguardando
-   * resposta (regra: só finaliza sem orçamento pendente) ou peça encomendada
-   * ainda por chegar. Registra o tempo e leva a OS para Finalizada; o evento
-   * dispara a baixa do estoque das peças reservadas.
+   * Bloqueia se houver orçamento pendente de resposta ou peça encomendada por
+   * chegar. O evento dispara a baixa das peças reservadas no estoque.
    */
   concluirExecucao(por?: string | null): void {
     if (this.temOrcamentoPendente()) {
@@ -401,10 +375,7 @@ export class OrdemServico extends AgregadoRaiz<string> {
     );
   }
 
-  /**
-   * Confirma o pagamento (manual): apenas marca a flag e libera a entrega.
-   * Só após a OS estar Finalizada. Não é uma transição de status.
-   */
+  /** Libera a entrega. Não é transição de status. */
   marcarPago(): void {
     if (this.props.status !== StatusOS.FINALIZADA) {
       throw new ErroTransicaoInvalida(
@@ -419,14 +390,10 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(new PagamentoConfirmado(this.id));
   }
 
-  /**
-   * Entrega o veículo e encerra a OS (Finalizada → Entregue). Exige pagamento
-   * confirmado — regra: reter o veículo até o pagamento.
-   */
+  /** Finalizada → Entregue. O veículo fica retido até o pagamento. */
   entregar(por?: string | null): void {
-    // Checa o estado ANTES do pagamento: uma OS que não pode ser entregue
-    // (ex.: cancelada) deve falhar com transição inválida, não com uma
-    // mensagem sobre pagamento que mascara a causa real.
+    // Estado antes do pagamento: uma OS cancelada deve falhar por transição
+    // inválida, não por uma mensagem de pagamento que mascara a causa.
     if (!transicaoPermitida(this.props.status, StatusOS.ENTREGUE)) {
       throw new ErroTransicaoInvalida(
         `Transição inválida: de ${this.props.status} para ${StatusOS.ENTREGUE}.`,
@@ -441,13 +408,10 @@ export class OrdemServico extends AgregadoRaiz<string> {
     this.registrarEvento(new VeiculoEntregue(this.id, this.props.numero));
   }
 
-  // ───────────────────────────── internos ─────────────────────────────
-
   private orcamentoInicial(): Orcamento | undefined {
     return this.props.orcamentos.find((o) => o.tipo === TipoOrcamento.INICIAL);
   }
 
-  /** Acha um orçamento por id e garante que está no estado esperado. */
   private orcamentoNoEstado(
     orcamentoId: string,
     esperado: StatusOrcamento,
@@ -464,7 +428,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
     return orcamento;
   }
 
-  /** Snapshot das peças do orçamento (situação original) para o Estoque. */
   private capturarPecasParaEstoque(orcamento: Orcamento): ItemPecaAprovado[] {
     return orcamento.pecas.map((i) => ({
       pecaId: i.pecaId,
@@ -476,7 +439,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
     }));
   }
 
-  /** Atualiza a situação das peças do orçamento aprovado. */
   private reservarPecasDoOrcamento(orcamento: Orcamento): void {
     for (const item of orcamento.pecas) {
       item.situacao =
@@ -486,7 +448,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
     }
   }
 
-  /** Há peça encomendada (aguardando chegar) em algum orçamento aprovado? */
   private temPecaEncomendada(): boolean {
     return this.props.orcamentos.some(
       (o) =>
@@ -495,7 +456,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
     );
   }
 
-  /** Há orçamento ainda não decidido pelo cliente (GERADO ou ENVIADO)? */
   private temOrcamentoPendente(): boolean {
     return this.props.orcamentos.some(
       (o) =>
@@ -513,8 +473,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
       this.props.iniciadoExecucaoEm.getTime();
     return Math.round(ms / 60000);
   }
-
-  // ───────────────────────────── getters ─────────────────────────────
 
   get numero(): string {
     return this.props.numero;
@@ -546,7 +504,6 @@ export class OrdemServico extends AgregadoRaiz<string> {
   get orcamentos(): readonly Orcamento[] {
     return this.props.orcamentos;
   }
-  /** Orçamento inicial (do diagnóstico), se já existir. */
   get orcamento(): Orcamento | null {
     return this.orcamentoInicial() ?? null;
   }

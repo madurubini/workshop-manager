@@ -1,10 +1,6 @@
 /**
- * Erros padronizados do domínio. São independentes de HTTP; o filtro de
- * exceções na camada de interfaces traduz cada um para o status correto e
- * para o envelope `{ erro: { codigo, mensagem, detalhes } }` do contrato.
- *
- * Nesta fase já existe a hierarquia mínima usada por `identidade`. Os demais
- * erros de regra de negócio entram na Fase 2 (Compartilhado).
+ * Independentes de HTTP: o filtro global traduz cada um para o status e para
+ * o envelope `{ erro: { codigo, mensagem, detalhes } }` do contrato.
  */
 export abstract class ErroDominio extends Error {
   abstract readonly codigo: string;
@@ -42,10 +38,7 @@ export class ErroNaoAutenticado extends ErroDominio {
   readonly codigo = 'NAO_AUTENTICADO';
 }
 
-/**
- * Autenticado, mas sem permissão para a operação (HTTP 403) — papel
- * insuficiente ou token de acompanhamento de outra OS.
- */
+/** Autenticado, mas sem permissão (HTTP 403). */
 export class ErroNaoAutorizado extends ErroDominio {
   readonly codigo = 'NAO_AUTORIZADO';
 }

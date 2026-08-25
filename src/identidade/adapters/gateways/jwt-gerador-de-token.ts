@@ -7,7 +7,6 @@ import {
   TokenGerado,
 } from '../../use-cases/gerador-de-token';
 
-/** Adaptador @nestjs/jwt da porta GeradorDeToken. */
 @Injectable()
 export class JwtGeradorDeToken implements GeradorDeToken {
   constructor(

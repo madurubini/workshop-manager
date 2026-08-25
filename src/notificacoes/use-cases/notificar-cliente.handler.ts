@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-// Importações SÓ DE TIPO: contratos dos eventos, sem acoplar ao módulo de OS.
+// Só de tipo: os contratos dos eventos, sem acoplar ao módulo de OS.
 import type {
   ExecucaoConcluida,
   OrcamentoAprovado,
@@ -15,12 +15,11 @@ import {
 import { NOTIFICADOR, Notificador } from './notificador';
 
 /**
- * Assinantes de eventos do contexto de notificações. Demonstra o fan-out do
- * event bus: o evento `orcamento-aprovado` é tratado tanto pelo Estoque
- * (reserva) quanto aqui (aviso ao cliente) — sem um conhecer o outro.
+ * Fan-out do event bus: `orcamento-aprovado` é tratado pelo Estoque (reserva)
+ * e aqui (aviso ao cliente), sem um conhecer o outro.
  *
- * Ao enviar o orçamento, gera um LINK com o token de acompanhamento daquela OS
- * (porta pública do identidade) — é por ele que o cliente aprova sem ter conta.
+ * O link enviado carrega o token de acompanhamento da OS — é por ele que o
+ * cliente aprova sem ter conta.
  */
 @Injectable()
 export class NotificarCliente {

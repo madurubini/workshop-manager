@@ -14,10 +14,8 @@ interface PropsPeca {
 }
 
 /**
- * Raiz de agregado Peça (Estoque). Invariante central:
- *   disponivel = saldoFisico - reservado
- * e nunca se reserva acima do disponível. Na Fase 4 usamos só leitura
- * (disponível) e cotação; reservar/baixar entram nas Fases 5 e 6.
+ * Invariante central: `disponivel = saldoFisico - reservado`, e nunca se
+ * reserva acima do disponível.
  */
 export class Peca extends AgregadoRaiz<string> {
   private constructor(
@@ -72,10 +70,7 @@ export class Peca extends AgregadoRaiz<string> {
     }
   }
 
-  /**
-   * Ajuste manual de saldo físico (entrada/saída). Uma saída não pode derrubar
-   * o saldo abaixo do que já está reservado (manteria o disponível negativo).
-   */
+  /** Uma saída não pode derrubar o saldo abaixo do que já está reservado. */
   ajustarSaldo(tipo: 'ENTRADA' | 'SAIDA', quantidade: number): void {
     if (quantidade <= 0) {
       throw new ErroValidacao('Quantidade do ajuste deve ser positiva.');
@@ -100,20 +95,15 @@ export class Peca extends AgregadoRaiz<string> {
     this.props.ativo = false;
   }
 
-  /** Quantidade livre para novas reservas. */
   get disponivel(): number {
     return this.props.saldoFisico - this.props.reservado;
   }
 
-  /** Há disponível suficiente para a quantidade pedida? (somente leitura) */
   temDisponivel(quantidade: number): boolean {
     return this.disponivel >= quantidade;
   }
 
-  /**
-   * Reserva uma quantidade para uma OS. Invariante: nunca reservar acima do
-   * disponível. Aumenta o "reservado" (o saldo físico só cai na baixa).
-   */
+  /** Aumenta o reservado; o saldo físico só cai na baixa. */
   reservar(quantidade: number): void {
     if (quantidade <= 0) {
       throw new ErroValidacao('Quantidade a reservar deve ser positiva.');
@@ -128,10 +118,7 @@ export class Peca extends AgregadoRaiz<string> {
     this.props.reservado += quantidade;
   }
 
-  /**
-   * Baixa peças efetivamente retiradas (Fase 6): só do que está reservado.
-   * Reduz tanto o reservado quanto o saldo físico.
-   */
+  /** Baixa o que estava reservado: reduz reservado e saldo físico. */
   baixar(quantidade: number): void {
     if (quantidade <= 0) {
       throw new ErroValidacao('Quantidade a baixar deve ser positiva.');

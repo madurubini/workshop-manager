@@ -29,10 +29,8 @@ export interface EntradaAtualizarCliente {
 }
 
 /**
- * Casos de uso do agregado Cliente (CRUD coeso). As validações de documento
- * moram no VO Documento (chamado pela raiz Cliente); aqui ficam as regras que
- * cruzam o repositório (unicidade do documento, recadastro) e a publicação de
- * eventos após persistir.
+ * A validação do documento mora no VO; aqui ficam as regras que dependem do
+ * repositório — unicidade e recadastro.
  */
 @Injectable()
 export class ClienteUseCases {
@@ -46,7 +44,6 @@ export class ClienteUseCases {
   ) {}
 
   async cadastrar(entrada: EntradaCadastrarCliente): Promise<Cliente> {
-    // A raiz valida o documento (formato + dígitos) ao construir.
     const novo = Cliente.cadastrar({
       id: this.ids.novo(),
       documento: entrada.documento,
@@ -59,14 +56,12 @@ export class ClienteUseCases {
       novo.documento.valor,
     );
     if (existente) {
-      // CPF/CNPJ de cliente ATIVO → duplicata real (409).
       if (existente.ativo) {
         throw new ErroConflito('Já existe um cliente com este documento.', {
           documento: novo.documento.formatado,
         });
       }
-      // CPF/CNPJ de cliente INATIVO → recadastro: reativa a linha existente
-      // (o documento é único; não criamos uma nova).
+      // Inativo: recadastro reativa a linha existente, não cria outra.
       existente.reativar({
         nome: entrada.nome,
         email: entrada.email,

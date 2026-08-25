@@ -4,7 +4,6 @@ import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/pris
 import { Cliente } from '../../entities/cliente';
 import { ClienteRepository } from '../../use-cases/cliente.repositorio';
 
-/** Gateway Prisma da porta ClienteRepository. */
 @Injectable()
 export class PrismaClienteRepository implements ClienteRepository {
   constructor(private readonly prisma: PrismaService) {}

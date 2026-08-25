@@ -10,7 +10,6 @@ export abstract class ObjetoDeValor<TProps extends object> {
     this.props = Object.freeze(props);
   }
 
-  /** Igualdade estrutural (por valor). */
   igualA(outro?: ObjetoDeValor<TProps>): boolean {
     if (outro === null || outro === undefined) {
       return false;

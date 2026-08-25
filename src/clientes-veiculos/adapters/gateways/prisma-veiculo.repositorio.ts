@@ -4,7 +4,6 @@ import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/pris
 import { Veiculo } from '../../entities/veiculo';
 import { VeiculoRepository } from '../../use-cases/veiculo.repositorio';
 
-/** Gateway Prisma da porta VeiculoRepository. */
 @Injectable()
 export class PrismaVeiculoRepository implements VeiculoRepository {
   constructor(private readonly prisma: PrismaService) {}

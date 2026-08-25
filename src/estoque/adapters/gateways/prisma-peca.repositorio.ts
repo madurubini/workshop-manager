@@ -5,7 +5,6 @@ import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/pris
 import { Peca } from '../../entities/peca';
 import { PecaRepository } from '../../use-cases/peca.repositorio';
 
-/** Gateway Prisma da porta PecaRepository. */
 @Injectable()
 export class PrismaPecaRepository implements PecaRepository {
   constructor(private readonly prisma: PrismaService) {}

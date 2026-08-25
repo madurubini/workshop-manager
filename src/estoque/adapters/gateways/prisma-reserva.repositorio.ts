@@ -7,7 +7,6 @@ import {
   StatusReserva,
 } from '../../use-cases/reserva.repositorio';
 
-/** Gateway Prisma da porta ReservaRepository. */
 @Injectable()
 export class PrismaReservaRepository implements ReservaRepository {
   constructor(private readonly prisma: PrismaService) {}

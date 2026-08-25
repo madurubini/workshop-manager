@@ -3,7 +3,6 @@ import { PrismaService } from '../../../compartilhado/infraestrutura/prisma/pris
 import { Papel, Usuario } from '../../entities/usuario';
 import { UsuarioRepository } from '../../use-cases/usuario.repositorio';
 
-/** Adaptador Prisma da porta UsuarioRepository. */
 @Injectable()
 export class PrismaUsuarioRepository implements UsuarioRepository {
   constructor(private readonly prisma: PrismaService) {}

@@ -15,12 +15,9 @@ import {
 } from '../../use-cases/acompanhamento-token';
 
 /**
- * Protege ações do cliente no acompanhamento (aprovar/recusar orçamento). Não
- * exige login de operador: valida o TOKEN DE ACOMPANHAMENTO (assinado, com
- * escopo de uma OS) e confere se o `osId` do token bate com o da URL — assim o
- * token de uma OS não serve para responder a OS de outra (sem IDOR).
- *
- * O token vem no header `Authorization: Bearer <token>` ou no query `?token=`.
+ * Em vez de login, valida o token de acompanhamento e confere se o `osId` dele
+ * bate com o da URL: o token de uma OS não responde por outra (sem IDOR).
+ * Aceita `Authorization: Bearer <token>` ou `?token=`.
  */
 @Injectable()
 export class AcompanhamentoGuard implements CanActivate {

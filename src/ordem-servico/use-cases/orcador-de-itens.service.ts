@@ -16,13 +16,9 @@ import {
 } from '../entities/itens';
 
 /**
- * Serviço de aplicação que ORÇA os itens de uma OS — compartilhado pelo
- * diagnóstico e pelos orçamentos adicionais. Concentra a regra de CONGELAR
- * preços (do catálogo e do estoque) e a verificação SOMENTE LEITURA do estoque,
- * cotando as peças em falta.
- *
- * Toda conversa com outros contextos passa pelas portas públicas
- * (CATALOGO_SERVICOS_API, ESTOQUE_API) — sem importar repositórios externos.
+ * Orça os itens da OS — usado pelo diagnóstico e pelos orçamentos adicionais.
+ * Congela os preços, consulta o estoque em modo leitura e cota as peças em
+ * falta, sempre pelas portas públicas dos outros contextos.
  */
 @Injectable()
 export class OrcadorDeItens {

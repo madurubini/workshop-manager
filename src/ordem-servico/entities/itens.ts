@@ -1,13 +1,7 @@
 /**
- * Entidades internas da OS: as linhas orçadas (serviço/peça) e o orçamento.
- * Não são agregados separados — vivem dentro da Ordem de Serviço. O preço é
- * SEMPRE congelado (precoAplicado) no momento do diagnóstico/lançamento,
- * conforme a decisão de negócio: o orçamento não puxa o preço do catálogo/
- * estoque na hora de exibir — ele vale o que foi acordado.
- *
- * Uma OS tem VÁRIOS orçamentos: um INICIAL (do diagnóstico) e zero ou mais
- * ADICIONAL (reparos descobertos durante a execução). Cada orçamento carrega
- * suas próprias linhas e é aprovado/recusado de forma independente.
+ * Linhas orçadas e orçamento — entidades internas da OS, não agregados
+ * separados. O `precoAplicado` é congelado no lançamento: o orçamento vale o
+ * que foi acordado, não o preço atual do catálogo.
  */
 
 export enum SituacaoPecaOrcada {
@@ -18,7 +12,6 @@ export enum SituacaoPecaOrcada {
   RESERVADA = 'RESERVADA',
 }
 
-/** Linha de serviço do orçamento (snapshot do catálogo, preço congelado). */
 export interface ServicoOrcado {
   id: string;
   servicoId: string;
@@ -27,7 +20,6 @@ export interface ServicoOrcado {
   precoAplicado: number; // congelado
 }
 
-/** Linha de peça do orçamento (snapshot do estoque, preço congelado). */
 export interface PecaOrcada {
   id: string;
   pecaId: string;
@@ -49,10 +41,7 @@ export enum StatusOrcamento {
   RECUSADO = 'RECUSADO',
 }
 
-/**
- * Orçamento da OS. O INICIAL nasce no diagnóstico; os ADICIONAL nascem na
- * execução (o antigo "reparo adicional") já enviados, aguardando o cliente.
- */
+/** O INICIAL nasce no diagnóstico; os ADICIONAL, na execução, já enviados. */
 export interface Orcamento {
   id: string;
   tipo: TipoOrcamento;
@@ -68,12 +57,11 @@ export interface Orcamento {
   pecas: PecaOrcada[];
 }
 
-/** Arredonda para 2 casas (dinheiro), evitando ruído de ponto flutuante. */
+/** Arredonda para 2 casas, evitando ruído de ponto flutuante. */
 export function arredondar2(valor: number): number {
   return Math.round((valor + Number.EPSILON) * 100) / 100;
 }
 
-/** Recalcula os totais de um orçamento a partir das suas linhas. */
 export function calcularTotais(orcamento: Orcamento): void {
   orcamento.totalServicos = arredondar2(
     orcamento.servicos.reduce((s, i) => s + i.precoAplicado * i.quantidade, 0),

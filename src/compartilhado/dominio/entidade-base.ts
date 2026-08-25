@@ -14,7 +14,6 @@ export abstract class EntidadeBase<TId> {
     return this._id;
   }
 
-  /** Igualdade por identidade (mesmo id e mesmo tipo de entidade). */
   igualA(outra?: EntidadeBase<TId>): boolean {
     if (outra === null || outra === undefined) {
       return false;

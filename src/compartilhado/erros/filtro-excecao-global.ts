@@ -19,30 +19,23 @@ import {
 } from './erros-dominio';
 
 /**
- * Converte um erro de infraestrutura (ex.: violação de unicidade do Prisma) no
- * erro de domínio equivalente, ou devolve `null` se não souber traduzi-lo.
- *
- * Existe para que o filtro continue **sem conhecer o Prisma**: quem conhece é o
- * tradutor, que vive na camada de infraestrutura e entra por injeção.
+ * Converte erro de infraestrutura em erro de domínio, ou `null` se não souber.
+ * Existe para o filtro não conhecer o Prisma: quem conhece é o tradutor.
  */
 export type TradutorDeErro = (erro: unknown) => ErroDominio | null;
 
 export interface OpcoesFiltroExcecao {
   /** Tradutores de erro de infraestrutura → erro de domínio, em ordem. */
   tradutores?: TradutorDeErro[];
-  /** Gerador do identificador de ocorrência (injetável para testar). */
+  /** Injetável para manter os testes determinísticos. */
   gerarIdDaOcorrencia?: () => string;
 }
 
 /**
- * Traduz qualquer exceção para o envelope padrão do contrato:
- * `{ erro: { codigo, mensagem, detalhes } }`.
- *
- * Mapeia os erros de domínio para os status HTTP definidos no contrato-api
- * (400 validação, 401 auth, 403 autorização, 404, 409 conflito, 422 transição
- * inválida). O que não é reconhecido vira 500 com um **id de ocorrência**: o
- * mesmo id vai para o log e para a resposta, então o suporte liga um ao outro
- * sem expor a stack ao cliente.
+ * Traduz qualquer exceção para o envelope `{ erro: { codigo, mensagem,
+ * detalhes } }`. O que não é reconhecido vira 500 com um id de ocorrência: o
+ * mesmo id vai para o log e para a resposta, ligando um ao outro sem expor a
+ * stack ao cliente.
  */
 @Catch()
 export class FiltroExcecaoGlobal implements ExceptionFilter {
@@ -92,13 +85,11 @@ export class FiltroExcecaoGlobal implements ExceptionFilter {
         status,
         codigo: this.codigoPadraoPorStatus(status),
         mensagem: mensagens.join('; '),
-        // Sempre a lista de mensagens: um formato só, venha do class-validator
-        // (array) ou de uma exceção com string única.
+        // Um formato só, venha do class-validator (array) ou de string única.
         detalhes: mensagens,
       };
     }
 
-    // Desconhecido: 500 com id de ocorrência para casar log e resposta.
     const idDaOcorrencia = this.gerarIdDaOcorrencia();
     this.logger.error(`Erro não tratado [${idDaOcorrencia}]`, excecao);
     return {

@@ -23,10 +23,7 @@ async function carregar(
   return ordem;
 }
 
-/**
- * Caso de uso: confirmar o pagamento (manual). Marca a flag `pago` na OS,
- * liberando a entrega. Pagamento não é uma transição de status.
- */
+/** Pagamento não é transição de status: só libera a entrega. */
 @Injectable()
 export class ConfirmarPagamento {
   constructor(
@@ -45,10 +42,6 @@ export class ConfirmarPagamento {
   }
 }
 
-/**
- * Caso de uso: entregar o veículo e encerrar a OS (→ Entregue). Exige
- * pagamento confirmado; a regra mora no agregado.
- */
 @Injectable()
 export class EntregarVeiculo {
   constructor(

@@ -6,7 +6,6 @@ import {
   PeriodoRelatorio,
 } from './ordem-servico.repositorio';
 
-/** Tempo médio das OS que contêm um determinado tipo de serviço. */
 export interface TempoMedioPorServico {
   servicoId: string;
   servicoNome: string;
@@ -21,13 +20,9 @@ export interface RelatorioTempoMedio {
 }
 
 /**
- * Caso de uso: tempo médio de execução das OS concluídas (base: do início da
- * execução à conclusão). Opcionalmente filtra por período de conclusão.
- *
- * Quebra por TIPO DE SERVIÇO (abordagem por OS): o tempo total de cada OS é
- * creditado a cada serviço executado nela. Logo, `tempoMedioMinutos` de um
- * serviço é a média do tempo das OS que o contêm — não o tempo isolado daquele
- * serviço (que exigiria cronometrar serviço a serviço).
+ * Tempo do início da execução à conclusão. Na quebra por serviço, o tempo
+ * total da OS é creditado a cada serviço dela: `tempoMedioMinutos` é a média
+ * das OS que contêm aquele serviço, não o tempo isolado dele.
  */
 @Injectable()
 export class RelatorioTempoMedioExecucao {
@@ -48,7 +43,6 @@ export class RelatorioTempoMedioExecucao {
 
     const somaMin = tempos.reduce((soma, t) => soma + minutos(t), 0);
 
-    // Agrega por serviço: cada OS contribui com seu tempo para cada serviço dela.
     const porServico = new Map<
       string,
       { nome: string; soma: number; ordens: number }
@@ -81,11 +75,7 @@ export class RelatorioTempoMedioExecucao {
     };
   }
 
-  /**
-   * Coerência entre os dois campos — regra que nenhum dos dois sozinho garante,
-   * por isso mora no caso de uso e não no DTO. O formato de cada data já foi
-   * validado na borda (`PeriodoRelatorioDto`).
-   */
+  /** Coerência entre os dois campos: nenhum deles sozinho a garante no DTO. */
   private validarPeriodo(periodo?: PeriodoRelatorio): void {
     const { inicio, fim } = periodo ?? {};
     if (inicio && fim && inicio.getTime() > fim.getTime()) {

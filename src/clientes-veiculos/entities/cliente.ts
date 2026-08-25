@@ -13,10 +13,8 @@ interface PropsCliente {
 }
 
 /**
- * Raiz de agregado Cliente. Pessoa física ou jurídica identificada pelo
- * documento (CPF/CNPJ). As invariantes de documento válido moram no value
- * object Documento; aqui garantimos o restante (nome obrigatório) e o ciclo
- * de vida (soft delete via `ativo`).
+ * Identificado pelo documento (CPF/CNPJ), cuja validação mora no value object
+ * Documento. Aqui ficam o nome obrigatório e o ciclo de vida (soft delete).
  */
 export class Cliente extends AgregadoRaiz<string> {
   private constructor(
@@ -26,7 +24,6 @@ export class Cliente extends AgregadoRaiz<string> {
     super(id);
   }
 
-  /** Cadastra um novo cliente (gera o evento ClienteCadastrado). */
   static cadastrar(entrada: {
     id: string;
     documento: string;
@@ -51,7 +48,6 @@ export class Cliente extends AgregadoRaiz<string> {
     return cliente;
   }
 
-  /** Reconstrói o cliente a partir do que já está persistido (sem eventos). */
   static restaurar(
     id: string,
     props: {
@@ -73,7 +69,7 @@ export class Cliente extends AgregadoRaiz<string> {
     });
   }
 
-  /** Atualiza dados de contato. O documento é imutável (é a identidade). */
+  /** O documento é imutável: é a identidade do cliente. */
   atualizarDados(entrada: {
     nome?: string;
     email?: string | null;
@@ -93,15 +89,14 @@ export class Cliente extends AgregadoRaiz<string> {
     }
   }
 
-  /** Soft delete: inativa o cliente sem apagar o registro. */
+  /** Soft delete: não apaga o registro. */
   inativar(): void {
     this.props.ativo = false;
   }
 
   /**
-   * Reativa um cliente que estava inativo (recadastro). O documento é a
-   * identidade e tem índice único — então recadastrar o mesmo CPF/CNPJ não cria
-   * uma linha nova: reativa a existente com os dados informados.
+   * Recadastro: como o documento tem índice único, o mesmo CPF/CNPJ não cria
+   * linha nova — reativa a existente com os dados informados.
    */
   reativar(entrada: {
     nome?: string;

@@ -49,7 +49,6 @@ export class Documento extends ObjetoDeValor<PropsDocumento> {
     return this.props.tipo;
   }
 
-  /** Versão formatada (com pontuação) para exibição. */
   get formatado(): string {
     const v = this.props.valor;
     return this.props.tipo === 'CPF'

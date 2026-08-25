@@ -41,7 +41,6 @@ const INCLUDE_COMPLETO = {
   },
 } as const;
 
-/** Gateway Prisma da porta OrdemServicoRepository. */
 @Injectable()
 export class PrismaOrdemServicoRepository implements OrdemServicoRepository {
   constructor(private readonly prisma: PrismaService) {}

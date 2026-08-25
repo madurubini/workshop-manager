@@ -7,7 +7,6 @@ import {
   StatusEncomenda,
 } from '../../use-cases/encomenda.repositorio';
 
-/** Gateway Prisma da porta EncomendaRepository. */
 @Injectable()
 export class PrismaEncomendaRepository implements EncomendaRepository {
   constructor(private readonly prisma: PrismaService) {}

@@ -6,7 +6,6 @@ export const ACOMPANHAMENTO_TOKEN = Symbol('AcompanhamentoToken');
  * OS. Vai no link enviado ao cliente; o cliente aprova/recusa sem ter conta.
  */
 export interface AcompanhamentoToken {
-  /** Gera o token assinado para uma OS (para montar o link do cliente). */
   gerar(osId: string): Promise<string>;
   /** Valida o token; devolve o osId, ou null se inválido/expirado/fora de escopo. */
   verificar(token: string): Promise<{ osId: string } | null>;

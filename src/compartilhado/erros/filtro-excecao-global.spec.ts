@@ -10,7 +10,6 @@ import {
 } from './erros-dominio';
 import { FiltroExcecaoGlobal } from './filtro-excecao-global';
 
-/** Captura o que o filtro escreveu na resposta HTTP. */
 function capturarResposta(): {
   host: ArgumentsHost;
   status: jest.Mock;

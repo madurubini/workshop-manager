@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-// Importação SÓ DE TIPO: o contrato dos eventos, sem acoplar ao módulo de OS.
+// Só de tipo: o contrato do evento, sem acoplar ao módulo de OS em runtime.
 import type { OrcamentoAprovado } from '../../ordem-servico/entities/eventos';
 import { FORNECEDOR, Fornecedor } from './fornecedor';
 import { PECA_REPOSITORY, PecaRepository } from './peca.repositorio';
@@ -10,14 +10,11 @@ import {
 } from './encomenda.repositorio';
 
 /**
- * Política do Estoque: ao aprovar o orçamento, reserva as peças disponíveis e
- * encomenda as faltantes. É um EFEITO POSTERIOR disparado por evento — por isso
- * não é uma rota nem uma chamada direta do Ordem de Serviço. O Estoque apenas
- * "escuta" o evento `ordem-servico.orcamento-aprovado`.
+ * Efeito disparado por evento, não rota: o Estoque escuta
+ * `ordem-servico.orcamento-aprovado` e reserva ou encomenda as peças.
  *
- * A reserva é ATÔMICA (UPDATE condicional no banco): mesmo que duas OS aprovem
- * a mesma peça ao mesmo tempo, só reserva quem ainda tem disponível; a outra
- * cai para encomenda. Sem corrida, sem dupla reserva.
+ * A reserva é atômica (UPDATE condicional): se duas OS aprovarem a mesma peça
+ * ao mesmo tempo, só reserva quem ainda tem saldo; a outra cai para encomenda.
  */
 @Injectable()
 export class ReservarNaAprovacao {
@@ -32,8 +29,6 @@ export class ReservarNaAprovacao {
     private readonly encomendas: EncomendaRepository,
   ) {}
 
-  // Vale para o orçamento INICIAL e os ADICIONAIS: ambos chegam aqui pelo
-  // mesmo evento `orcamento-aprovado`, com as peças daquele orçamento.
   @OnEvent('ordem-servico.orcamento-aprovado')
   async aoAprovarOrcamento(evento: OrcamentoAprovado): Promise<void> {
     await this.reservarOuEncomendar(evento.ordemId, evento.itensPeca);
@@ -44,7 +39,6 @@ export class ReservarNaAprovacao {
     itensPeca: OrcamentoAprovado['itensPeca'],
   ): Promise<void> {
     for (const item of itensPeca) {
-      // Peça que estava disponível no diagnóstico: tenta reservar atomicamente.
       if (item.situacao === 'DISPONIVEL') {
         const reservou = await this.pecas.reservarAtomico({
           pecaId: item.pecaId,
@@ -54,16 +48,13 @@ export class ReservarNaAprovacao {
         if (reservou) {
           continue;
         }
-        // O disponível acabou entre o diagnóstico e a aprovação (outra OS levou):
-        // cai para encomenda, como se estivesse em falta.
+        // O saldo acabou entre o diagnóstico e a aprovação: vira encomenda.
         this.logger.warn(
           `Peça ${item.pecaId} sem disponível na aprovação (corrida); encomendando.`,
         );
       }
 
-      // Peça em falta (EM_COTACAO) ou que perdeu a corrida: encomenda.
-      // Faz o pedido ao fornecedor E registra a pendência, para sabermos qual
-      // OS aguardava quando a peça der ENTRADA no estoque.
+      // Registra a pendência para saber qual OS aguarda quando a peça entrar.
       await this.fornecedor.encomendar({
         ordemId,
         pecaId: item.pecaId,

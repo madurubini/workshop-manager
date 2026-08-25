@@ -1,7 +1,6 @@
 import { Peca } from '../../entities/peca';
 import { PecaRespostaDto } from '../dtos';
 
-/** Presenter da Peça: traduz a entidade para a resposta da API (função pura). */
 export function apresentarPeca(peca: Peca): PecaRespostaDto {
   return {
     id: peca.id,

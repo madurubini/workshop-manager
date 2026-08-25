@@ -88,7 +88,7 @@ export class Veiculo extends AgregadoRaiz<string> {
     });
   }
 
-  /** Atualiza marca/modelo/ano. A placa é imutável (é a identidade). */
+  /** A placa é imutável: é a identidade do veículo. */
   atualizarDados(entrada: {
     marca?: string;
     modelo?: string;

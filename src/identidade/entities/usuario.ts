@@ -1,4 +1,3 @@
-/** Papéis administrativos previstos na linguagem ubíqua. */
 export type Papel = 'RECEPCIONISTA' | 'MECANICO' | 'GESTOR';
 
 /**

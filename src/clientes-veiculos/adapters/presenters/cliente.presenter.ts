@@ -1,7 +1,6 @@
 import { Cliente } from '../../entities/cliente';
 import { ClienteRespostaDto } from '../dtos';
 
-/** Presenter do Cliente: traduz a entidade para a resposta da API (função pura). */
 export function apresentarCliente(cliente: Cliente): ClienteRespostaDto {
   return {
     id: cliente.id,

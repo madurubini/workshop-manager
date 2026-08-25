@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { HashDeSenha } from '../../use-cases/hash-de-senha';
 
-/** Adaptador bcrypt da porta HashDeSenha. */
 @Injectable()
 export class BcryptHashDeSenha implements HashDeSenha {
   private readonly custo = 10;
