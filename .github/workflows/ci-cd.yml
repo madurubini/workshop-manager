@@ -1,0 +1,218 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline de Integração e Entrega Contínua.
+#
+# Executa em máquinas descartáveis do próprio GitHub ("runners hospedados").
+# Como o cluster de demonstração é local, o job de deploy sobe um Minikube
+# DENTRO do runner: assim o deploy é real e verificável a cada push, sem
+# depender de nenhuma máquina ligada.
+# ─────────────────────────────────────────────────────────────────────────────
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Permite disparar manualmente pela aba Actions.
+  workflow_dispatch:
+
+env:
+  IMAGEM: oficina-api
+  TAG: local
+  NAMESPACE: oficina
+
+jobs:
+  # ── 1. Qualidade: o código compila, passa no lint e nos testes ────────────
+  qualidade:
+    name: Build e testes
+    runs-on: ubuntu-latest
+
+    # Os testes e2e da Ordem de Serviço rodam contra um Postgres DE VERDADE
+    # (fazem `prisma db push` e exercitam o gateway). O GitHub sobe este
+    # container junto com o job e o mantém no ar enquanto ele durar.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: oficina
+          POSTGRES_PASSWORD: oficina
+          POSTGRES_DB: oficina_e2e
+        ports:
+          - 5433:5432
+        # O job só começa depois que o banco responde ao pg_isready.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        # `npm ci` instala exatamente o que está no package-lock.json — é o
+        # comando de CI (o `npm install` poderia atualizar versões sozinho).
+        run: npm ci
+
+      - name: Gerar o Prisma Client
+        # Os tipos de @prisma/client são gerados a partir do schema; sem isto
+        # o build TypeScript falha.
+        run: npm run prisma:generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build da aplicação
+        run: npm run build
+
+      - name: Testes unitários com cobertura
+        # O threshold de 80% está no package.json: cobertura abaixo disso
+        # falha o job e barra o merge.
+        run: npm run test:cov
+
+      - name: Testes end-to-end
+        # O banco dedicado de e2e é resetado pelo próprio teste (`db push
+        # --force-reset`); por isso nunca aponta para o banco da aplicação.
+        env:
+          DATABASE_URL_E2E: postgresql://oficina:oficina@localhost:5433/oficina_e2e?schema=public
+        run: npm run test:e2e
+
+  # ── 2. Imagem: empacota a aplicação em container ──────────────────────────
+  imagem:
+    name: Imagem Docker
+    runs-on: ubuntu-latest
+    needs: qualidade
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build da imagem
+        run: docker build -t ${{ env.IMAGEM }}:${{ env.TAG }} .
+
+      - name: Exportar a imagem para o próximo job
+        # Sem registry, a imagem viaja entre jobs como arquivo. `docker save`
+        # serializa a imagem inteira num tar.
+        run: docker save ${{ env.IMAGEM }}:${{ env.TAG }} -o imagem.tar
+
+      - name: Publicar artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagem-docker
+          path: imagem.tar
+          retention-days: 1
+
+  # ── 3. Infraestrutura: o código Terraform é válido e está formatado ───────
+  infraestrutura:
+    name: Validação do Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.9
+
+      - name: Formatação
+        run: terraform fmt -check -recursive
+        working-directory: infra
+
+      - name: Inicializar sem backend
+        # -backend=false porque aqui só validamos a sintaxe: não há cluster
+        # nem estado para consultar neste job.
+        run: terraform init -backend=false
+        working-directory: infra
+
+      - name: Validar
+        run: terraform validate
+        working-directory: infra
+
+  # ── 4. Deploy: provisiona a infra e implanta no cluster ───────────────────
+  deploy:
+    name: Deploy no Kubernetes
+    runs-on: ubuntu-latest
+    needs: [imagem, infraestrutura]
+    # Só implanta no push para main — em pull request a pipeline para na
+    # validação, sem publicar nada.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Subir um cluster Minikube no runner
+        uses: medyagh/setup-minikube@latest
+        with:
+          cpus: 2
+          memory: 4000mb
+          addons: metrics-server
+
+      - name: Baixar a imagem do job anterior
+        uses: actions/download-artifact@v4
+        with:
+          name: imagem-docker
+
+      - name: Carregar a imagem no cluster
+        run: |
+          docker load -i imagem.tar
+          minikube image load ${{ env.IMAGEM }}:${{ env.TAG }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.9
+          # Desliga o wrapper que polui a saída dos comandos.
+          terraform_wrapper: false
+
+      - name: Provisionar namespace, Secrets e banco de dados (Terraform)
+        # É este passo que cumpre o "deploy do banco de dados" da pipeline.
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve \
+            -var="banco_senha=${{ secrets.BANCO_SENHA || 'senha-de-ci' }}" \
+            -var="jwt_secret=${{ secrets.JWT_SECRET || 'segredo-de-ci' }}"
+        working-directory: infra
+
+      - name: Aplicar os manifestos da aplicação
+        run: |
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/job-migracoes.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/hpa.yaml
+
+      - name: Aguardar as migrations
+        run: |
+          kubectl wait --for=condition=complete job/migracoes \
+            -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl logs job/migracoes -n ${{ env.NAMESPACE }} --tail=20
+
+      - name: Aguardar a API entrar no ar
+        run: |
+          kubectl rollout status deployment/oficina-api \
+            -n ${{ env.NAMESPACE }} --timeout=300s
+
+      - name: Smoke test
+        # Prova de que o deploy funcionou de ponta a ponta: a API responde, o
+        # banco está acessível e o seed rodou (o login usa o usuário semeado).
+        run: |
+          URL="http://$(minikube ip):30080"
+          echo "API em $URL"
+
+          curl -fsS "$URL/api/v1/health/live"  | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -fsS "$URL/api/v1/health/ready" | tee /dev/stderr | grep -q '"database":{"status":"up"}'
+
+          curl -fsS -X POST "$URL/api/v1/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"gestor","senha":"gestor123"}' \
+            | grep -q accessToken
+
+          echo "Smoke test concluído com sucesso."
+
+      - name: Estado final do cluster
+        # Roda mesmo se algum passo acima falhar — é o retrato para diagnóstico.
+        if: always()
+        run: |
+          kubectl get all,pvc,configmap,secret -n ${{ env.NAMESPACE }}
+          kubectl describe hpa oficina-api -n ${{ env.NAMESPACE }} || true
