@@ -4,7 +4,8 @@ Back-end do Sistema de Atendimento e Execução de Serviços de uma oficina mec�
 cadastro de clientes/veículos, **Ordem de Serviço** (diagnóstico → orçamento → execução →
 entrega), controle de **estoque de peças** e acompanhamento do cliente por link público.
 
-**Stack:** TypeScript · NestJS 11 · PostgreSQL 16 + Prisma 5 · JWT · Swagger · Docker.
+**Stack:** TypeScript · NestJS 11 · PostgreSQL 16 + Prisma 5 · JWT · Swagger.
+**Infraestrutura:** Docker · Kubernetes (Minikube) · Terraform · GitHub Actions.
 
 ---
 
@@ -26,6 +27,16 @@ concentrando as regras de negócio no agregado **Ordem de Serviço**:
 - **Acompanhamento do cliente** por link público (token da OS): consultar o status e aprovar/recusar
   orçamentos sem login de operador.
 - **Notificações** ao cliente disparadas por evento (ex.: orçamento enviado).
+
+Na **Fase 2**, a mesma aplicação ganha a infraestrutura que a sustenta em escala:
+
+- **Clean Architecture** em todos os módulos, com a regra de dependência apontando para dentro.
+- **Containerização** revisada: imagem multi-stage, usuário sem privilégios, migrations fora do start.
+- **Orquestração em Kubernetes**: Deployment, Service, ConfigMap, Secrets, Job e **HPA**
+  (escala automática por CPU/memória).
+- **Infraestrutura como código** com Terraform: namespace, segredos e banco de dados provisionados
+  por comando, não à mão.
+- **CI/CD** no GitHub Actions: build, testes, imagem Docker e deploy verificado num cluster real.
 
 ---
 
@@ -303,7 +314,9 @@ docker exec oficina-db psql -U oficina -d oficina -c "CREATE DATABASE oficina_e2
 npm run test:e2e
 ```
 
-Para apontar o e2e a outro banco, exporte `DATABASE_URL_E2E`.
+Para apontar o e2e a outro banco, exporte `DATABASE_URL_E2E` — é assim que a pipeline faz: o job
+de qualidade sobe um Postgres como *service container* do GitHub Actions e aponta essa variável
+para ele.
 
 ---
 
@@ -395,6 +408,210 @@ flowchart RL
 O ciclo de vida da OS, o fluxo ponta a ponta e o desvio de peça em falta estão desenhados em
 **[`docs/arquitetura.md`](docs/arquitetura.md)**.
 
+---
+
+## Infraestrutura (Fase 2)
+
+A Fase 2 evolui a aplicação para rodar em **infraestrutura escalável e provisionada por código**:
+containerização revisada, orquestração em Kubernetes, IaC com Terraform e pipeline de CI/CD.
+Tudo roda **localmente**, num cluster Minikube.
+
+### Componentes
+
+```mermaid
+flowchart TB
+    subgraph cluster["Cluster Kubernetes (Minikube)"]
+        subgraph ns["namespace: oficina"]
+            svc["<b>Service</b> oficina-api<br/>NodePort 30080"]
+
+            subgraph dep["Deployment oficina-api"]
+                p1["Pod API"]
+                p2["Pod API"]
+                pn["Pod API …"]
+            end
+
+            hpa["<b>HPA</b><br/>2 a 10 réplicas<br/>CPU 60% · memória 75%"]
+            job["<b>Job</b> migracoes<br/><i>prisma migrate deploy + seed</i>"]
+            cm["<b>ConfigMap</b><br/>PORT · NODE_ENV · JWT_EXPIRES_IN"]
+            sec["<b>Secrets</b><br/>DATABASE_URL · JWT_SECRET<br/>credenciais do Postgres"]
+
+            subgraph sts["StatefulSet oficina-db"]
+                pg["Pod Postgres 16"]
+            end
+            pvc[("<b>PVC</b> 1Gi<br/><i>dados persistentes</i>")]
+        end
+        ms["metrics-server<br/><i>addon</i>"]
+    end
+
+    usuario(["Cliente / Swagger"]) --> svc --> dep
+    hpa -.->|"escala"| dep
+    ms -.->|"consumo de CPU/memória"| hpa
+    job -->|"cria as tabelas<br/>antes da API subir"| pg
+    dep --> pg
+    pg --- pvc
+    cm -.->|envFrom| dep
+    sec -.->|envFrom| dep
+
+    classDef app fill:#e3f2e8,stroke:#4a8a5f,color:#12301d
+    classDef infra fill:#e8f0fe,stroke:#4a6fa5,color:#1a2b47
+    classDef dado fill:#f4f1e8,stroke:#9a8c68,color:#3d3520
+    class dep,svc,p1,p2,pn app
+    class hpa,ms,job,cm,sec infra
+    class sts,pg,pvc dado
+```
+
+### Quem provisiona o quê
+
+| | Ferramenta | Recursos |
+|---|---|---|
+| **Plataforma** | Terraform (`infra/`) | Namespace, Secrets, StatefulSet do Postgres + volume, Service do banco |
+| **Aplicação** | Manifestos YAML (`k8s/`) | Deployment, Service, ConfigMap, HPA, Job de migrations |
+
+O que tem **estado ou segredo** fica no Terraform (ele guarda o estado e injeta credenciais por
+variável, sem versioná-las); o que é **descartável e recriável** fica em YAML puro, mais direto de
+ler e aplicar. Detalhes de cada recurso em [`infra/README.md`](infra/README.md).
+
+### Fluxo de deploy
+
+```mermaid
+flowchart LR
+    dev(["push na main"]) --> ci
+
+    subgraph ci["GitHub Actions (runner hospedado)"]
+        direction TB
+        q["<b>1. Qualidade</b><br/>lint · build<br/>238 testes + cobertura 80%"]
+        img["<b>2. Imagem</b><br/>docker build<br/>artefato .tar"]
+        tf["<b>3. Terraform</b><br/>fmt · validate"]
+        dp["<b>4. Deploy</b><br/>Minikube efêmero no runner<br/>terraform apply → banco<br/>kubectl apply → aplicação<br/>smoke test"]
+        q --> img --> dp
+        q --> tf --> dp
+    end
+
+    subgraph local["Máquina local (demonstração)"]
+        direction TB
+        l1["make cluster"] --> l2["make infra<br/><i>terraform apply</i>"] --> l3["make imagem<br/><i>build no daemon do Minikube</i>"] --> l4["make manifestos<br/><i>Job → Deployment</i>"]
+    end
+
+    classDef ciC fill:#e8f0fe,stroke:#4a6fa5,color:#1a2b47
+    classDef localC fill:#e3f2e8,stroke:#4a8a5f,color:#12301d
+    class q,img,tf,dp ciC
+    class l1,l2,l3,l4 localC
+```
+
+A pipeline não alcança o cluster da máquina local — um runner hospedado não tem rota até ele. Por
+isso o job de deploy **sobe seu próprio Minikube dentro do runner**: o deploy é real e verificado a
+cada push (migrations, rollout e smoke test com login), sem depender de nenhuma máquina ligada.
+
+### Pré-requisitos
+
+```bash
+# kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+install -m 0755 kubectl ~/.local/bin/kubectl && rm kubectl
+
+# minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+install -m 0755 minikube-linux-amd64 ~/.local/bin/minikube && rm minikube-linux-amd64
+
+# terraform
+curl -LO https://releases.hashicorp.com/terraform/1.15.9/terraform_1.15.9_linux_amd64.zip
+unzip terraform_1.15.9_linux_amd64.zip && install -m 0755 terraform ~/.local/bin/terraform
+```
+
+Docker também é necessário — é o "motor" onde o Minikube cria o nó do cluster.
+
+### Deploy no Kubernetes
+
+```bash
+make cluster      # minikube start + addon metrics-server
+make deploy       # terraform apply → build da imagem → manifestos → rollout
+make url          # imprime a URL da API e do Swagger
+```
+
+Passo a passo, sem o Makefile:
+
+```bash
+# 1. Cluster (o metrics-server é o que alimenta o HPA)
+minikube start --driver=docker --cpus=4 --memory=6144
+minikube addons enable metrics-server
+
+# 2. Plataforma: namespace, Secrets e Postgres
+cd infra && terraform init && terraform apply && cd ..
+
+# 3. Imagem — construída DENTRO do daemon do Minikube, para o cluster enxergá-la
+#    sem registry (e sem o cache de tag antiga do `minikube image load`)
+eval $(minikube docker-env) && docker build -t oficina-api:local .
+
+# 4. Aplicação
+kubectl apply -f k8s/configmap.yaml -f k8s/job-migracoes.yaml \
+              -f k8s/deployment.yaml -f k8s/service.yaml -f k8s/hpa.yaml
+
+# 5. Migrations primeiro, API depois
+kubectl wait --for=condition=complete job/migracoes -n oficina --timeout=300s
+kubectl rollout status deployment/oficina-api -n oficina
+
+# 6. Acessar
+echo "http://$(minikube ip):30080/api/docs"
+```
+
+### Escalabilidade automática
+
+```bash
+make carga                              # gera carga na API
+watch kubectl get hpa,pods -n oficina   # acompanhe as réplicas subindo
+make sem-carga                          # remove a carga; o HPA volta ao mínimo
+```
+
+Comportamento observado: com carga, o consumo passa de 60% do `requests.cpu` e o HPA vai de
+**2 → 5 réplicas** em cerca de 2 minutos; sem carga, aguarda 2 minutos de calmaria (janela de
+estabilização) e volta a 2. O `scaleDown` é deliberadamente mais lento que o `scaleUp` para o
+número de réplicas não ficar oscilando a cada pico curto.
+
+### Decisões de infraestrutura
+
+**Minikube como cluster local.** Um cluster de um nó, criado dentro do Docker, que sobe e é
+destruído por comando. A alternativa era um cluster gerenciado na nuvem (EKS): mais próximo de
+produção, mas com custo e dependência de credenciais para qualquer pessoa reproduzir o ambiente.
+kind e k3d são mais leves, porém exigiriam instalar o `metrics-server` à mão — no Minikube ele é
+um addon.
+
+**Terraform provisiona a plataforma; YAML descreve a aplicação.** O critério da divisão é *estado
+e segredo*: o que precisa sobreviver (o volume do banco) e o que não pode ser versionado
+(credenciais) fica no Terraform, que mantém estado e recebe valores por variável; o resto, que é
+descartável e recriável, fica em YAML — mais direto de ler, aplicar e revisar. A alternativa,
+Terraform aplicando também os manifestos (`kubernetes_manifest`), reduziria tudo a um comando,
+mas transformaria o Terraform em invólucro do `kubectl` e tornaria o estado frágil.
+
+**Postgres em StatefulSet, migrations em Job.** Banco tem estado, e o StatefulSet é o que dá ao
+pod um nome estável e um volume próprio que **não** é apagado quando ele morre — um Deployment
+trataria o banco como peça descartável. As migrations saíram do start da API e viraram um Job,
+que roda uma vez até concluir: com o HPA criando réplicas sob demanda, mantê-las no start faria
+várias réplicas migrarem o mesmo banco ao mesmo tempo. O `docker-entrypoint.sh` continua
+existindo, mas só para o Compose, onde há uma instância só.
+
+**Liveness sem banco, readiness com banco.** As duas sondas respondem a perguntas diferentes: a
+liveness decide se o pod é **reiniciado**; a readiness, se ele **recebe tráfego**. Se ambas
+checassem o banco, uma instabilidade do Postgres derrubaria em cascata réplicas de API sadias,
+quando o correto é apenas tirá-las do balanceamento até o banco voltar. A `startupProbe`
+completa o arranjo, dando ~60s de tolerância no boot sem afrouxar a liveness depois.
+
+**Pipeline em runner hospedado, com cluster efêmero.** Um runner hospedado não tem rota até um
+cluster local, então o job de deploy sobe o seu próprio Minikube: o deploy é verificado de
+verdade a cada push — migrations aplicadas, rollout concluído, login funcionando — sem depender
+de nenhuma máquina ligada. A alternativa era um runner *self-hosted*, que implantaria no cluster
+real e unificaria pipeline e demonstração, ao custo de manter o runner registrado e a máquina
+disponível.
+
+Decisões menores, pelo mesmo raciocínio:
+
+| Decisão | Motivo |
+|---|---|
+| **`requests` declarados** | O HPA calcula a utilização como percentual do `requests` — sem ele, o autoscaler fica em `<unknown>` e nunca escala |
+| **Usuário não-root** (uid 1000) | Reduz o impacto de uma eventual execução de código no container; o `runAsNonRoot` exige uid **numérico**, então declarar `USER node` no Dockerfile não basta |
+| **Secrets no Terraform** | Mantém credencial fora do repositório: o valor vem de variável, não de YAML versionado |
+| **`imagePullPolicy: IfNotPresent`** | A imagem é carregada no cluster, não vem de registry; com `Always` o Kubernetes tentaria baixá-la e falharia |
+| **Build no daemon do Minikube** | Com uma tag fixa, `minikube image load` mantém a imagem antiga em cache e o cluster segue servindo a versão anterior |
+
 ## Documentação
 
 | Documento | Conteúdo |
@@ -404,6 +621,6 @@ O ciclo de vida da OS, o fluxo ponta a ponta e o desvio de peça em falta estão
 | [`docs/linguagem-ubiqua.md`](docs/linguagem-ubiqua.md) | Vocabulário do domínio (Event Storming). |
 | [`docs/schema.prisma`](docs/schema.prisma) | Cópia documental do schema de dados. |
 | [`docs/adr/`](docs/adr) | Decisões da Fase 1 (ex.: escolha do banco). |
-| [`docs/fase2/rules.md`](docs/fase2/rules.md) | Regras operacionais da Clean Architecture aplicadas aqui. |
-| [`docs/fase2/decisoes-arquiteturais.md`](docs/fase2/decisoes-arquiteturais.md) | O porquê de cada decisão da refatoração (ADR-01 a ADR-12). |
+| [`infra/README.md`](infra/README.md) | Recursos provisionados pelo Terraform e como aplicá-los. |
+| [`k8s/`](k8s) | Manifestos da aplicação, comentados recurso a recurso. |
 | [`docs/relatorio-vulnerabilidades.md`](docs/relatorio-vulnerabilidades.md) | Análise de segurança do MVP. |
