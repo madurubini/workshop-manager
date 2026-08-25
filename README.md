@@ -522,37 +522,152 @@ Docker também é necessário — é o "motor" onde o Minikube cria o nó do clu
 
 ### Deploy no Kubernetes
 
+Com o Makefile, três comandos:
+
 ```bash
 make cluster      # minikube start + addon metrics-server
 make deploy       # terraform apply → build da imagem → manifestos → rollout
 make url          # imprime a URL da API e do Swagger
 ```
 
-Passo a passo, sem o Makefile:
+Passo a passo, com o que verificar em cada etapa:
+
+**1. Cluster.** O `metrics-server` é quem mede CPU e memória dos pods — sem ele o HPA
+não tem como decidir se deve escalar.
 
 ```bash
-# 1. Cluster (o metrics-server é o que alimenta o HPA)
 minikube start --driver=docker --cpus=4 --memory=6144
 minikube addons enable metrics-server
 
-# 2. Plataforma: namespace, Secrets e Postgres
-cd infra && terraform init && terraform apply && cd ..
+kubectl get nodes                 # o nó "minikube" deve aparecer como Ready
+```
 
-# 3. Imagem — construída DENTRO do daemon do Minikube, para o cluster enxergá-la
-#    sem registry (e sem o cache de tag antiga do `minikube image load`)
+**2. Plataforma (Terraform).** Cria o namespace, os Secrets e o Postgres com seu volume.
+O `apply` só termina quando o banco aceita conexão.
+
+```bash
+cd infra
+terraform init                    # baixa o provider; roda uma vez
+terraform plan                    # confira: "Plan: 5 to add"
+terraform apply                   # confirme com "yes"
+cd ..
+
+kubectl get statefulset,pvc,secret -n oficina
+# oficina-db 1/1 · PVC "Bound" · secrets oficina-secrets e oficina-db-credenciais
+```
+
+**3. Imagem.** Construída **dentro do daemon do Minikube**, e não no Docker do host: assim
+o cluster a enxerga sem precisar de um registry.
+
+```bash
 eval $(minikube docker-env) && docker build -t oficina-api:local .
 
-# 4. Aplicação
+minikube image ls | grep oficina  # docker.io/library/oficina-api:local
+```
+
+> ⚠️ Não use `minikube image load` com a tag fixa `:local`. Se a tag já existir no cluster,
+> a imagem antiga permanece em cache e a API continua servindo a versão anterior — foi
+> exatamente esse o sintoma que apareceu aqui (probes respondendo 404 numa rota recém-criada).
+
+**4. Aplicação.** O Job migra o banco; o Deployment sobe a API.
+
+```bash
 kubectl apply -f k8s/configmap.yaml -f k8s/job-migracoes.yaml \
               -f k8s/deployment.yaml -f k8s/service.yaml -f k8s/hpa.yaml
 
-# 5. Migrations primeiro, API depois
 kubectl wait --for=condition=complete job/migracoes -n oficina --timeout=300s
-kubectl rollout status deployment/oficina-api -n oficina
+kubectl logs job/migracoes -n oficina | tail -3   # "All migrations have been successfully applied"
 
-# 6. Acessar
-echo "http://$(minikube ip):30080/api/docs"
+kubectl rollout status deployment/oficina-api -n oficina
+kubectl get pods -n oficina                       # 2 pods da API + oficina-db-0, todos Running
 ```
+
+**5. Acessar e conferir.**
+
+```bash
+URL="http://$(minikube ip):30080"
+echo "$URL/api/docs"
+
+curl -s "$URL/api/v1/health/ready"                # {"status":"ok", database "up"}
+curl -s -X POST "$URL/api/v1/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"gestor","senha":"gestor123"}'  # devolve o accessToken
+```
+
+O usuário `gestor` existe porque o Job rodou o seed junto com as migrations.
+
+**Para recomeçar do zero** (apaga o banco, inclusive os dados):
+
+```bash
+make destruir     # kubectl delete + terraform destroy
+```
+
+### Secrets: de onde vem cada credencial
+
+Um Secret do Kubernetes é um objeto que guarda valores sensíveis e os entrega ao container
+como variável de ambiente. Os valores ficam em **base64, que é codificação e não
+criptografia** — a proteção real vem de quem tem permissão de lê-los no cluster, não do
+encoding. O ganho concreto aqui é outro: **credencial nenhuma fica escrita em arquivo
+versionado**.
+
+Existem dois Secrets, com públicos diferentes:
+
+| Secret | Chaves | Quem consome |
+|---|---|---|
+| `oficina-db-credenciais` | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | O container do Postgres, que usa esses valores para criar o banco no primeiro boot |
+| `oficina-secrets` | `DATABASE_URL`, `JWT_SECRET` | A API e o Job de migrations |
+
+O caminho que um valor percorre:
+
+```mermaid
+flowchart LR
+    v["variável do Terraform<br/><i>banco_senha</i>"] --> l["locals.database_url<br/><i>monta a string de conexão</i>"]
+    l --> s["Secret oficina-secrets<br/><i>no cluster</i>"]
+    s -->|envFrom| p["Pod da API<br/><i>process.env.DATABASE_URL</i>"]
+
+    classDef tf fill:#e8f0fe,stroke:#4a6fa5,color:#1a2b47
+    classDef k8s fill:#e3f2e8,stroke:#4a8a5f,color:#12301d
+    class v,l tf
+    class s,p k8s
+```
+
+1. **O valor entra como variável do Terraform** (`infra/variables.tf`), marcada `sensitive`
+   para não ser impressa no `plan`/`apply`.
+2. **O Terraform monta a `DATABASE_URL`** em `infra/locals.tf`, juntando usuário, senha, host
+   e banco — por isso a senha aparece uma vez só, na variável.
+3. **O Terraform cria o Secret** (`kubernetes_secret.aplicacao`, em `infra/main.tf`).
+4. **O Deployment consome com `envFrom`** (`k8s/deployment.yaml`): todas as chaves do Secret
+   viram variáveis de ambiente do container.
+5. **A aplicação lê `process.env.DATABASE_URL`** normalmente, sem saber que veio de um Secret.
+
+Por isso `k8s/secret.example.yaml` existe mas **não é aplicado**: ele documenta o formato
+esperado. O Secret real nasce do Terraform, e nenhum valor de verdade entra no repositório.
+
+Para trocar as credenciais:
+
+```bash
+cd infra
+cp terraform.tfvars.example terraform.tfvars   # não é versionado (.gitignore)
+# edite banco_senha e jwt_secret
+terraform apply
+kubectl rollout restart deployment/oficina-api -n oficina   # o pod relê as variáveis ao subir
+```
+
+Para inspecionar o que está no cluster:
+
+```bash
+kubectl get secret oficina-secrets -n oficina -o jsonpath='{.data.JWT_SECRET}' | base64 -d
+terraform -chdir=infra output -raw database_url
+```
+
+Na pipeline, os mesmos valores chegam por **secrets do GitHub Actions**
+(`secrets.BANCO_SENHA` e `secrets.JWT_SECRET`), passados como `-var` no `terraform apply`.
+Se não estiverem configurados no repositório, o workflow cai para valores de teste — o
+cluster do CI é descartável e some ao fim da execução.
+
+> Em produção isto seria diferente: o Secret viria de um gerenciador externo (AWS Secrets
+> Manager, Vault) via External Secrets Operator, e o `tfstate` — que guarda os valores em
+> texto puro — ficaria num backend remoto com criptografia e controle de acesso, não em disco.
 
 ### Escalabilidade automática
 
