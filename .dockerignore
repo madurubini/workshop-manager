@@ -18,6 +18,10 @@ coverage
 # Testes, documentação e configs de dev — fora da imagem de produção
 test
 docs
+k8s
+infra
+.github
+Makefile
 *.md
 .eslintrc.js
 .prettierrc

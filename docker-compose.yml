@@ -3,15 +3,20 @@ services:
     image: postgres:16-alpine
     container_name: oficina-db
     environment:
-      POSTGRES_USER: oficina
-      POSTGRES_PASSWORD: oficina
-      POSTGRES_DB: oficina
+      POSTGRES_USER: ${POSTGRES_USER:-oficina}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oficina}
+      POSTGRES_DB: ${POSTGRES_DB:-oficina}
     ports:
-      - '5433:5432'
+      # 5433 no host: a 5432 já é usada por outro container na máquina.
+      - '${POSTGRES_PORT:-5433}:5432'
     volumes:
       - oficina-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U oficina -d oficina']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-oficina} -d ${POSTGRES_DB:-oficina}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -24,14 +29,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # A imagem só inicia a API (CMD). No desenvolvimento local o entrypoint
+    # aplica as migrations e o seed antes — no Kubernetes quem faz isso é o Job.
+    entrypoint: ['./docker-entrypoint.sh']
     environment:
-      DATABASE_URL: 'postgresql://oficina:oficina@db:5432/oficina?schema=public'
+      DATABASE_URL: 'postgresql://${POSTGRES_USER:-oficina}:${POSTGRES_PASSWORD:-oficina}@db:5432/${POSTGRES_DB:-oficina}?schema=public'
       PORT: '3000'
       NODE_ENV: production
-      JWT_SECRET: 'segredo-de-desenvolvimento-nao-use-em-producao'
-      JWT_EXPIRES_IN: '3600s'
+      JWT_SECRET: ${JWT_SECRET:-segredo-de-desenvolvimento-nao-use-em-producao}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-3600s}
     ports:
-      - '3000:3000'
+      - '${APP_PORT:-3000}:3000'
     healthcheck:
       # Usa o fetch nativo do Node 20 (a imagem slim não tem curl/wget).
       test:
