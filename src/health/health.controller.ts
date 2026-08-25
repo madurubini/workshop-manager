@@ -8,9 +8,15 @@ import {
 import { PrismaService } from '../compartilhado/infraestrutura/prisma/prisma.service';
 
 /**
- * Sonda de saúde da aplicação (pública). Responde 200 quando o app está no ar
- * e o banco está acessível; 503 caso contrário. É o que o Docker (e qualquer
- * orquestrador) consulta para decidir se o container está pronto/saudável.
+ * Sondas de saúde da aplicação (públicas). São três, porque o orquestrador faz
+ * duas perguntas diferentes e uma resposta só não serve para as duas:
+ *
+ * - `/health/live`   (liveness)  — "o processo está vivo?". Se falhar, o pod é
+ *   REINICIADO. Por isso não toca no banco: uma instabilidade do Postgres não
+ *   pode derrubar em cascata réplicas que estão perfeitamente sadias.
+ * - `/health/ready`  (readiness) — "posso mandar tráfego?". Se falhar, o pod só
+ *   sai do balanceamento até se recuperar. Aqui sim o banco é verificado.
+ * - `/health`        — sonda completa, mantida para o Docker Compose e o README.
  */
 @ApiTags('Saúde')
 @Controller('health')
@@ -24,9 +30,28 @@ export class HealthController {
   @Get()
   @HealthCheck()
   @ApiOperation({
-    summary: 'Liveness/readiness: aplicação no ar e banco acessível',
+    summary: 'Sonda completa: aplicação no ar e banco acessível',
   })
   verificar() {
+    return this.health.check([
+      () => this.db.pingCheck('database', this.prisma),
+    ]);
+  }
+
+  @Get('live')
+  @ApiOperation({
+    summary: 'Liveness: o processo está vivo (não consulta o banco)',
+  })
+  vivo() {
+    return { status: 'ok' };
+  }
+
+  @Get('ready')
+  @HealthCheck()
+  @ApiOperation({
+    summary: 'Readiness: pronto para receber tráfego (banco acessível)',
+  })
+  pronto() {
     return this.health.check([
       () => this.db.pingCheck('database', this.prisma),
     ]);
