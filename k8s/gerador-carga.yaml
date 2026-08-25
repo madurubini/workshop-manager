@@ -1,0 +1,36 @@
+# Pod descartável que martela a API em laço para fazer o HPA escalar durante a
+# demonstração. Não faz parte do sistema — aplique só na hora de mostrar a
+# escalabilidade e remova depois:
+#   kubectl apply -f k8s/gerador-carga.yaml
+#   kubectl delete -f k8s/gerador-carga.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gerador-carga
+  namespace: oficina
+  labels:
+    app.kubernetes.io/name: gerador-carga
+spec:
+  restartPolicy: Never
+  containers:
+    - name: carga
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          # 20 laços paralelos batendo na sonda que consulta o banco: gasta CPU
+          # de verdade (JSON + query) e leva o consumo médio acima dos 60%.
+          for i in $(seq 1 20); do
+            while true; do
+              wget -q -O /dev/null http://oficina-api/api/v1/health/ready || true
+            done &
+          done
+          wait
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi
+        limits:
+          cpu: 300m
+          memory: 64Mi

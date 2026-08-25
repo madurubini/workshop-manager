@@ -1,0 +1,15 @@
+# ConfigMap guarda configuração NÃO sensível em pares chave/valor. O Deployment
+# injeta tudo isto como variáveis de ambiente (envFrom), então mudar um valor
+# aqui e reiniciar o pod muda a configuração sem rebuildar a imagem.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oficina-config
+  namespace: oficina
+  labels:
+    app.kubernetes.io/name: oficina-api
+    app.kubernetes.io/part-of: workshop-manager
+data:
+  PORT: '3000'
+  NODE_ENV: 'production'
+  JWT_EXPIRES_IN: '3600s'

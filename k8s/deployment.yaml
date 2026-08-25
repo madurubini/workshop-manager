@@ -1,0 +1,83 @@
+# Deployment mantém N cópias (réplicas) da API no ar e sabe substituir uma que
+# morra ou atualizar todas sem downtime (rolling update). É o objeto que o HPA
+# manipula quando decide escalar.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oficina-api
+  namespace: oficina
+  labels:
+    app.kubernetes.io/name: oficina-api
+    app.kubernetes.io/part-of: workshop-manager
+spec:
+  replicas: 2
+  selector:
+    # Como o Deployment reconhece "seus" pods: pelo rótulo abaixo.
+    matchLabels:
+      app.kubernetes.io/name: oficina-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # nunca reduz abaixo do desejado durante o deploy
+      maxSurge: 1 # sobe um pod novo por vez
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oficina-api
+    spec:
+      containers:
+        - name: api
+          image: oficina-api:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: oficina-config
+            - secretRef:
+                name: oficina-secrets
+          # ── Probes ──────────────────────────────────────────────────────
+          # startup: dá tempo para o Nest subir sem que as outras probes o
+          # matem antes da hora (30 x 2s = até 60s de tolerância no boot).
+          startupProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          # liveness: se falhar, o pod é REINICIADO. Não consulta o banco.
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # readiness: se falhar, o pod sai do balanceamento do Service até
+          # se recuperar. Aqui sim o banco é verificado.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # ── Recursos ────────────────────────────────────────────────────
+          # requests é o que o pod reserva no nó; limits é o teto.
+          # O HPA calcula o uso como percentual do REQUEST — sem requests
+          # declarados o autoscaler fica em <unknown> e nunca escala.
+          resources:
+            requests:
+              cpu: 100m # 0,1 de um núcleo
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            # O kubelet precisa do UID NUMÉRICO para provar que o usuário não é
+            # root: `USER node` no Dockerfile é só um nome, e a verificação
+            # falha com "image has non-numeric user". 1000 é o uid do usuário
+            # "node" na imagem oficial do Node.
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false

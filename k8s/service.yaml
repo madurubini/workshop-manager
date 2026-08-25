@@ -1,0 +1,23 @@
+# Service dá um nome estável e um IP fixo para um conjunto de pods que vive
+# mudando. Sem ele, cada pod novo teria um IP diferente e ninguém saberia
+# onde encontrar a API. Também balanceia as requisições entre as réplicas.
+apiVersion: v1
+kind: Service
+metadata:
+  name: oficina-api
+  namespace: oficina
+  labels:
+    app.kubernetes.io/name: oficina-api
+    app.kubernetes.io/part-of: workshop-manager
+spec:
+  # NodePort expõe a porta 30080 do nó para fora do cluster — é o que permite
+  # abrir a API no navegador com `minikube service oficina-api -n oficina`.
+  # (ClusterIP, o padrão, só seria alcançável de dentro do cluster.)
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: oficina-api
+  ports:
+    - name: http
+      port: 80 # porta do Service
+      targetPort: http # porta do container (3000)
+      nodePort: 30080 # porta no nó do Minikube

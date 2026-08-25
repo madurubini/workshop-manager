@@ -1,0 +1,62 @@
+# Job roda uma tarefa até ela terminar com sucesso e então para — diferente do
+# Deployment, que mantém pods no ar para sempre. É o recurso certo para migrar
+# o banco: precisa acontecer UMA vez, antes da API subir. Se ficasse no start
+# da API, as réplicas criadas pelo HPA migrariam o banco todas ao mesmo tempo.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migracoes
+  namespace: oficina
+  labels:
+    app.kubernetes.io/name: migracoes
+    app.kubernetes.io/part-of: workshop-manager
+spec:
+  # Tenta no máximo 4 vezes antes de desistir e marcar o Job como falho.
+  backoffLimit: 4
+  # Some sozinho 5 min depois de concluir, para não acumular Jobs velhos.
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: migracoes
+    spec:
+      # Job não reinicia o pod em caso de erro no container: quem controla a
+      # repetição é o backoffLimit acima.
+      restartPolicy: Never
+      initContainers:
+        # O Postgres pode ainda estar iniciando quando o Job começa. Este
+        # container roda ANTES do principal e só termina quando o banco aceita
+        # conexão — o container de migração nem chega a rodar antes disso.
+        - name: aguardar-banco
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h oficina-db -p 5432; do
+                echo "Postgres ainda não responde; aguardando..."
+                sleep 2
+              done
+              echo "Postgres pronto."
+      containers:
+        - name: migracoes
+          image: oficina-api:local
+          # A imagem foi carregada no cluster com `minikube image load`, não vem
+          # de um registry. Com "Always" o Kubernetes tentaria baixá-la e falharia.
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - 'npx prisma migrate deploy && node dist/prisma/seed.js'
+          envFrom:
+            - configMapRef:
+                name: oficina-config
+            - secretRef:
+                name: oficina-secrets
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
