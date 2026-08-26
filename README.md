@@ -66,7 +66,6 @@ Postgres nem nada além do Docker na máquina.
 | | |
 |---|---|
 | **Obrigatório** | Docker Engine com o plugin `docker compose` (v2) |
-| Opcional | `jq`, só para deixar legíveis os exemplos de `curl` deste README |
 
 Confirme antes de começar:
 
