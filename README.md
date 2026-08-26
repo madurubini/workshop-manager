@@ -143,7 +143,7 @@ que percorre uma OS do recebimento à entrega — ou abra o Swagger e explore pe
 
 | Recurso | Endereço |
 |---|---|
-| API | http://localhost:3000/api/v1 |
+| API (base das rotas) | http://localhost:3000/api/v1 — prefixo global; a raiz não é rota, use os caminhos abaixo |
 | Swagger | http://localhost:3000/api/docs |
 | OpenAPI JSON | http://localhost:3000/api/docs-json |
 | Health check | http://localhost:3000/api/v1/health |
@@ -550,7 +550,7 @@ Com o Makefile, três comandos:
 ```bash
 make cluster      # minikube start + addon metrics-server
 make deploy       # terraform apply → build da imagem → manifestos → rollout
-make url          # imprime a URL da API e do Swagger
+make url          # imprime a URL do Swagger e da sonda de saúde
 ```
 
 Passo a passo, com o que verificar em cada etapa:
@@ -826,6 +826,7 @@ decoradores nos controllers, então nunca fica defasado em relação ao código.
 |---|---|---|
 | Swagger UI | http://localhost:3000/api/docs | `http://$(minikube ip):30080/api/docs` |
 | OpenAPI JSON | http://localhost:3000/api/docs-json | `http://$(minikube ip):30080/api/docs-json` |
+| Health check | http://localhost:3000/api/v1/health | `http://$(minikube ip):30080/api/v1/health` |
 
 Pelo Swagger dá para autenticar e disparar as chamadas sem sair do navegador:
 

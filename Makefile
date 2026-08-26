@@ -34,9 +34,11 @@ manifestos: ## Aplica os manifestos da aplicação
 deploy: infra imagem manifestos ## Ciclo completo: infra + imagem + manifestos
 	@$(MAKE) --no-print-directory url
 
-url: ## Mostra a URL da API e do Swagger
-	@echo "API:     http://$$(minikube ip):30080/api/v1"
+url: ## Mostra a URL do Swagger e da sonda de saúde
+	# /api/v1 é só o prefixo global do Nest — não existe rota na raiz, então
+	# acessá-la devolve 404. O health check é o endpoint de fumaça equivalente.
 	@echo "Swagger: http://$$(minikube ip):30080/api/docs"
+	@echo "Saúde:   http://$$(minikube ip):30080/api/v1/health"
 
 carga: ## Sobe o gerador de carga para ver o HPA escalar
 	kubectl apply -f k8s/gerador-carga.yaml
