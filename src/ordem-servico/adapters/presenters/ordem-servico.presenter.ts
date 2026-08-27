@@ -1,4 +1,9 @@
-import { Orcamento, SituacaoPecaOrcada } from '../../entities/itens';
+import {
+  Orcamento,
+  PecaOrcada,
+  ServicoOrcado,
+  SituacaoPecaOrcada,
+} from '../../entities/itens';
 import { OrdemServico } from '../../entities/ordem-servico';
 import { ROTULO_STATUS } from '../../entities/status-os';
 import {
@@ -7,6 +12,25 @@ import {
   OrcamentoDto,
   OrdemServicoRespostaDto,
 } from '../dtos';
+
+function apresentarServico(item: ServicoOrcado) {
+  return {
+    servicoId: item.servicoId,
+    descricao: item.descricao,
+    quantidade: item.quantidade,
+    precoAplicado: item.precoAplicado,
+  };
+}
+
+function apresentarPeca(item: PecaOrcada) {
+  return {
+    pecaId: item.pecaId,
+    descricao: item.descricao,
+    quantidade: item.quantidade,
+    precoAplicado: item.precoAplicado,
+    situacao: item.situacao,
+  };
+}
 
 function apresentarOrcamento(orcamento: Orcamento): OrcamentoDto {
   return {
@@ -17,19 +41,8 @@ function apresentarOrcamento(orcamento: Orcamento): OrcamentoDto {
     totalPecas: orcamento.totalPecas,
     total: orcamento.total,
     status: orcamento.status,
-    servicos: orcamento.servicos.map((item) => ({
-      servicoId: item.servicoId,
-      descricao: item.descricao,
-      quantidade: item.quantidade,
-      precoAplicado: item.precoAplicado,
-    })),
-    pecas: orcamento.pecas.map((item) => ({
-      pecaId: item.pecaId,
-      descricao: item.descricao,
-      quantidade: item.quantidade,
-      precoAplicado: item.precoAplicado,
-      situacao: item.situacao,
-    })),
+    servicos: orcamento.servicos.map(apresentarServico),
+    pecas: orcamento.pecas.map(apresentarPeca),
   };
 }
 
@@ -48,6 +61,8 @@ export function apresentarOrdemServico(
     pago: ordem.pago,
     pagoEm: ordem.pagoEm,
     criadoEm: ordem.criadoEm,
+    servicos: ordem.servicos.map(apresentarServico),
+    pecas: ordem.pecas.map(apresentarPeca),
     historico: ordem.historico.map((h) => ({
       status: ROTULO_STATUS[h.status],
       em: h.em,

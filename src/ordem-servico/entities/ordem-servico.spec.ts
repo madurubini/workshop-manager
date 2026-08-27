@@ -598,3 +598,69 @@ describe('Guardas e getters do agregado', () => {
     ).toThrow(ErroValidacao);
   });
 });
+
+describe('Serviços e peças consolidados da OS', () => {
+  it('a OS recém-aberta já tem os arrays, vazios', () => {
+    const os = abrirOS();
+    expect(os.servicos).toEqual([]);
+    expect(os.pecas).toEqual([]);
+  });
+
+  it('o diagnóstico preenche os arrays com as linhas do orçamento inicial', () => {
+    const os = abrirOS();
+    os.iniciarDiagnostico();
+    os.registrarDiagnostico({
+      servicos: [servico({ descricao: 'Troca de óleo' })],
+      pecas: [peca({ descricao: 'Filtro de óleo' })],
+      orcamentoId: 'orc-1',
+    });
+
+    expect(os.servicos).toHaveLength(1);
+    expect(os.servicos[0].descricao).toBe('Troca de óleo');
+    expect(os.pecas).toHaveLength(1);
+    expect(os.pecas[0].descricao).toBe('Filtro de óleo');
+  });
+
+  it('soma as linhas do adicional às do inicial, sem achatar o preço congelado', () => {
+    const os = abrirOS();
+    os.iniciarDiagnostico();
+    os.registrarDiagnostico({
+      servicos: [servico({ precoAplicado: 100 })],
+      pecas: [],
+      orcamentoId: 'orc-1',
+    });
+    os.aprovarOrcamento('orc-1');
+    os.adicionarOrcamentoAdicional({
+      id: 'orc-2',
+      descricao: 'Reparo extra',
+      // Mesmo serviço, preço acordado diferente: as duas linhas convivem.
+      servicos: [servico({ id: 'is2', precoAplicado: 150 })],
+      pecas: [peca({ id: 'ip2', pecaId: 'p2', descricao: 'Correia' })],
+    });
+
+    expect(os.servicos.map((s) => s.precoAplicado)).toEqual([100, 150]);
+    expect(os.pecas.map((p) => p.descricao)).toEqual(['Correia']);
+  });
+
+  it('o orçamento recusado sai da consolidação', () => {
+    const os = abrirOS();
+    os.iniciarDiagnostico();
+    os.registrarDiagnostico({
+      servicos: [servico()],
+      pecas: [],
+      orcamentoId: 'orc-1',
+    });
+    os.aprovarOrcamento('orc-1');
+    os.adicionarOrcamentoAdicional({
+      id: 'orc-2',
+      descricao: 'Reparo recusado',
+      servicos: [servico({ id: 'is2', servicoId: 's2' })],
+      pecas: [peca({ id: 'ip2', pecaId: 'p2' })],
+    });
+    expect(os.servicos).toHaveLength(2);
+
+    os.recusarOrcamento('orc-2');
+    expect(os.servicos.map((s) => s.servicoId)).toEqual(['s1']);
+    expect(os.pecas).toEqual([]);
+  });
+});

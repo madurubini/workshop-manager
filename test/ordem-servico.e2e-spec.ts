@@ -134,6 +134,9 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
       .expect(201);
     const osId = os.body.id;
     expect(os.body.status).toBe('Recebida');
+    // Os arrays existem desde a abertura, vazios — quem preenche é o diagnóstico.
+    expect(os.body.servicos).toEqual([]);
+    expect(os.body.pecas).toEqual([]);
 
     // 4. Diagnóstico: o mecânico assume a OS e registra os itens (o orçamento
     // inicial já sai enviado ao cliente na conclusão do diagnóstico).
@@ -151,6 +154,16 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
       .expect(200);
     const orcamentoId = diag.body.orcamento.id;
     expect(diag.body.orcamento.total).toBe(190); // 120 + 2*35
+
+    // Depois do diagnóstico a OS consolida as linhas do orçamento inicial.
+    const osComItens = await http
+      .get(`${base}/ordens-servico/${osId}`)
+      .set(auth)
+      .expect(200);
+    expect(osComItens.body.servicos).toHaveLength(1);
+    expect(osComItens.body.servicos[0].servicoId).toBe(SERVICO_ID);
+    expect(osComItens.body.pecas).toHaveLength(1);
+    expect(osComItens.body.pecas[0].pecaId).toBe(PECA_ID);
 
     // 5. Cliente aprova via TOKEN DE ACOMPANHAMENTO (sem login de operador)
     const acomp = app.get<AcompanhamentoToken>(ACOMPANHAMENTO_TOKEN);

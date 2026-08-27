@@ -456,6 +456,13 @@ export class OrdemServico extends AgregadoRaiz<string> {
     );
   }
 
+  /** Orçamentos que ainda valem: o recusado saiu do escopo da OS. */
+  private orcamentosVigentes(): Orcamento[] {
+    return this.props.orcamentos.filter(
+      (o) => o.status !== StatusOrcamento.RECUSADO,
+    );
+  }
+
   private temOrcamentoPendente(): boolean {
     return this.props.orcamentos.some(
       (o) =>
@@ -506,6 +513,24 @@ export class OrdemServico extends AgregadoRaiz<string> {
   }
   get orcamento(): Orcamento | null {
     return this.orcamentoInicial() ?? null;
+  }
+  /**
+   * Serviços e peças da OS como um todo: as linhas de todos os orçamentos que
+   * o cliente não recusou (o inicial mais os adicionais que seguiram em pé).
+   *
+   * As linhas continuam pertencendo ao orçamento que as congelou — isto aqui é
+   * só a leitura consolidada. Por isso não somam quantidades de itens iguais:
+   * duas linhas do mesmo serviço em orçamentos diferentes podem ter preços
+   * acordados diferentes, e achatá-las apagaria justamente o preço congelado.
+   *
+   * Numa OS recém-aberta os dois vêm vazios — o array existe desde a abertura
+   * e o diagnóstico o preenche.
+   */
+  get servicos(): readonly ServicoOrcado[] {
+    return this.orcamentosVigentes().flatMap((o) => o.servicos);
+  }
+  get pecas(): readonly PecaOrcada[] {
+    return this.orcamentosVigentes().flatMap((o) => o.pecas);
   }
   get iniciadoExecucaoEm(): Date | null {
     return this.props.iniciadoExecucaoEm;

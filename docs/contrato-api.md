@@ -80,6 +80,20 @@ o banco — o cliente recebe o mesmo 409 dos dois jeitos.
 | `POST /ordens-servico/{id}/entrega` | Entrega o veículo e encerra a OS. | Status → Entregue → encerrada. Exige pagamento confirmado. |
 | `GET /relatorios/tempo-medio-execucao` | Tempo médio de execução das OS concluídas, com recorte opcional por data (`?inicio=&fim=`, ISO-8601). | — |
 
+Exemplo da abertura:
+```json
+// POST /ordens-servico
+// req
+{ "clienteId": "uuid", "veiculoId": "uuid", "problemaRelatado": "Barulho na suspensão" }
+// res 201
+{ "id": "uuid", "numero": "OS-000001", "status": "Recebida",
+  "servicos": [], "pecas": [], "orcamentos": [], "historico": [ { "status": "Recebida", "em": "...", "por": "gestor" } ] }
+```
+
+Toda resposta de OS traz `servicos` e `pecas`: a leitura consolidada das linhas
+dos orçamentos que o cliente não recusou. Os arrays existem desde a abertura,
+vazios — quem os preenche é o diagnóstico (e, depois, os adicionais aprovados).
+
 Exemplo do diagnóstico (a rota que mais concentra):
 ```json
 // POST /ordens-servico/{id}/diagnostico

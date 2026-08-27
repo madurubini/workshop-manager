@@ -77,6 +77,18 @@ export class OrdemServicoRespostaDto {
   @ApiProperty() pago!: boolean;
   @ApiProperty({ nullable: true }) pagoEm!: Date | null;
   @ApiProperty() criadoEm!: Date;
+  @ApiProperty({
+    type: [ServicoOrcadoDto],
+    description:
+      'Serviços da OS, consolidados dos orçamentos não recusados. Vazio na abertura; o diagnóstico preenche.',
+  })
+  servicos!: ServicoOrcadoDto[];
+  @ApiProperty({
+    type: [PecaOrcadaDto],
+    description:
+      'Peças da OS, consolidadas dos orçamentos não recusados. Vazio na abertura; o diagnóstico preenche.',
+  })
+  pecas!: PecaOrcadaDto[];
   @ApiProperty({ type: [HistoricoItemDto] }) historico!: HistoricoItemDto[];
   @ApiProperty({ type: [OrcamentoDto] }) orcamentos!: OrcamentoDto[];
 }
