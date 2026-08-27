@@ -182,6 +182,22 @@ export class PagamentoDto {
   pago!: boolean;
 }
 
+/**
+ * Correção manual do status pelo gestor. O status vem no vocabulário interno
+ * (`EM_EXECUCAO`), o mesmo do filtro da listagem — o rótulo legível
+ * ("Em execução") é coisa da resposta, não da entrada.
+ */
+export class AlterarStatusDto {
+  @ApiProperty({
+    enum: StatusOS,
+    example: StatusOS.CANCELADA,
+    description:
+      'Novo status. Precisa ser uma transição válida a partir do status atual da OS (senão 422).',
+  })
+  @IsEnum(StatusOS)
+  status!: StatusOS;
+}
+
 export class DiagnosticoRespostaDto {
   @ApiProperty({ example: 'Aguardando aprovação' }) status!: string;
   @ApiProperty({ type: OrcamentoDto }) orcamento!: OrcamentoDto;

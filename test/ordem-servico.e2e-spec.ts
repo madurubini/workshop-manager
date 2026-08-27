@@ -433,4 +433,58 @@ describe('Fluxo da OS (e2e — integração com Postgres)', () => {
       .send({ aprovado: true })
       .expect(403);
   }, 30000);
+
+  it('gestor corrige o status pela rota administrativa, dentro da máquina de estados', async () => {
+    const http = request(app.getHttpServer());
+    const base = '/api/v1';
+    const login = await http
+      .post(`${base}/auth/login`)
+      .send({ username: 'gestor', senha: 'gestor123' })
+      .expect(200);
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+
+    const cli = await http
+      .post(`${base}/clientes`)
+      .set(auth)
+      .send({ documento: '453.178.287-91', nome: 'Rita' })
+      .expect(201);
+    const veic = await http
+      .post(`${base}/clientes/${cli.body.id}/veiculos`)
+      .set(auth)
+      .send({ placa: 'RTA2H44', marca: 'Honda', modelo: 'Fit', ano: 2019 })
+      .expect(201);
+    const os = await http
+      .post(`${base}/ordens-servico`)
+      .set(auth)
+      .send({
+        clienteId: cli.body.id,
+        veiculoId: veic.body.id,
+        problemaRelatado: 'Revisão',
+      })
+      .expect(201);
+
+    // Pular etapas continua sendo 422: a rota corrige, não fura o fluxo.
+    const pulo = await http
+      .patch(`${base}/ordens-servico/${os.body.id}/status`)
+      .set(auth)
+      .send({ status: 'FINALIZADA' })
+      .expect(422);
+    expect(pulo.body.erro.codigo).toBe('TRANSICAO_INVALIDA');
+
+    // Status inexistente para no DTO, antes do domínio.
+    await http
+      .patch(`${base}/ordens-servico/${os.body.id}/status`)
+      .set(auth)
+      .send({ status: 'INVENTADO' })
+      .expect(400);
+
+    // Cliente desistiu: cancelamento manual a partir de Recebida.
+    const cancelada = await http
+      .patch(`${base}/ordens-servico/${os.body.id}/status`)
+      .set(auth)
+      .send({ status: 'CANCELADA' })
+      .expect(200);
+    expect(cancelada.body.status).toBe('Cancelada');
+    expect(cancelada.body.historico.at(-1).por).toBe('gestor');
+  }, 30000);
 });

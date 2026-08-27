@@ -72,6 +72,7 @@ o banco — o cliente recebe o mesmo 409 dos dois jeitos.
 | `GET /ordens-servico` | Lista/filtra (`?status=&clienteId=`). | — |
 | `GET /ordens-servico/fila` | **Fila de trabalho**: só as OS ativas, ordenadas por prioridade de status (Em execução > Aguardando aprovação > Em diagnóstico > Recebida) e, dentro de cada status, as mais antigas primeiro. Exclui logicamente finalizadas, entregues e canceladas. | — |
 | `GET /ordens-servico/{id}` | Detalhe completo da OS. | — |
+| `PATCH /ordens-servico/{id}/status` | **Correção manual do status** (`status`, no vocabulário interno: `CANCELADA`, `EM_DIAGNOSTICO`…). **GESTOR apenas.** | Registra a transição no histórico com o usuário que a fez. Só aceita transição válida na máquina de estados (senão 422) e **não** refaz os efeitos das rotas de negócio — reserva, baixa de peça e tempo de execução ficam como estavam. Cancelar por aqui publica `os-cancelada`, então o Estoque libera as encomendas pendentes. |
 | `POST /ordens-servico/{id}/diagnostico/iniciar` | Mecânico inicia o diagnóstico (só o id da OS). | Status → Em diagnóstico. |
 | `POST /ordens-servico/{id}/diagnostico` | Registra serviços + peças e conclui o diagnóstico. Exige o diagnóstico já iniciado (OS em Em diagnóstico). | Verifica estoque, cota faltantes, gera **e envia** o orçamento; status → Aguardando aprovação; notifica o cliente. |
 | `POST /ordens-servico/{id}/execucao/concluir` | Mecânico conclui a execução. | Baixa peças reservadas, registra tempo; status → Finalizada (se nenhum orçamento estiver pendente). |

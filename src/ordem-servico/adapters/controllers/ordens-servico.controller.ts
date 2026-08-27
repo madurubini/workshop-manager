@@ -5,16 +5,25 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ErroValidacao } from '../../../compartilhado/erros/erros-dominio';
 import { JwtAuthGuard } from '../../../identidade/adapters/guards/jwt-auth.guard';
+import { Papeis } from '../../../identidade/adapters/decorators/papeis.decorator';
+import { PapeisGuard } from '../../../identidade/adapters/guards/papeis.guard';
 import { UsuarioAtual } from '../../../identidade/adapters/decorators/usuario-atual.decorator';
 import { UsuarioAutenticado } from '../../../identidade/adapters/guards/jwt.strategy';
 import { AbrirOrdemServico } from '../../use-cases/abrir-ordem-servico.usecase';
+import { AlterarStatusDaOrdem } from '../../use-cases/alterar-status.usecase';
 import { ConcluirExecucao } from '../../use-cases/concluir-execucao.usecase';
 import { ConsultarOrdemServico } from '../../use-cases/consultar-ordem-servico.usecase';
 import {
@@ -30,6 +39,7 @@ import {
 } from '../presenters/ordem-servico.presenter';
 import {
   AbrirOrdemServicoDto,
+  AlterarStatusDto,
   DiagnosticoRespostaDto,
   FiltrarOrdensServicoDto,
   LancarOrcamentoAdicionalDto,
@@ -40,11 +50,12 @@ import {
 
 @ApiTags('Ordens de Serviço')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PapeisGuard)
 @Controller('ordens-servico')
 export class OrdensServicoController {
   constructor(
     private readonly abrirOrdemServico: AbrirOrdemServico,
+    private readonly alterarStatus: AlterarStatusDaOrdem,
     private readonly iniciarDiagnostico: IniciarDiagnostico,
     private readonly registrarDiagnostico: RegistrarDiagnostico,
     private readonly concluirExecucao: ConcluirExecucao,
@@ -94,6 +105,29 @@ export class OrdensServicoController {
   @ApiOperation({ summary: 'Detalhe completo da OS' })
   async porId(@Param('id') id: string): Promise<OrdemServicoRespostaDto> {
     return apresentarOrdemServico(await this.consulta.buscar(id));
+  }
+
+  @Patch(':id/status')
+  @Papeis('GESTOR')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Corrige manualmente o status da OS (GESTOR apenas). Só transições ' +
+      'válidas na máquina de estados; não refaz os efeitos das rotas de ' +
+      'negócio (reserva, baixa de peça, tempo de execução).',
+  })
+  @ApiForbiddenResponse({ description: 'Apenas GESTOR pode corrigir o status' })
+  async status(
+    @Param('id') id: string,
+    @Body() dto: AlterarStatusDto,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ): Promise<OrdemServicoRespostaDto> {
+    const ordem = await this.alterarStatus.executar({
+      ordemId: id,
+      status: dto.status,
+      por: usuario.username,
+    });
+    return apresentarOrdemServico(ordem);
   }
 
   @Post(':id/diagnostico/iniciar')

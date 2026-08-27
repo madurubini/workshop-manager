@@ -4,6 +4,7 @@ import { ClientesVeiculosModule } from '../clientes-veiculos/clientes-veiculos.m
 import { EstoqueModule } from '../estoque/estoque.module';
 import { IdentidadeModule } from '../identidade/identidade.module';
 import { AbrirOrdemServico } from './use-cases/abrir-ordem-servico.usecase';
+import { AlterarStatusDaOrdem } from './use-cases/alterar-status.usecase';
 import { AprovarOrcamento } from './use-cases/aprovar-orcamento.usecase';
 import { ConcluirExecucao } from './use-cases/concluir-execucao.usecase';
 import { ConsultarOrdemServico } from './use-cases/consultar-ordem-servico.usecase';
@@ -48,6 +49,7 @@ import { RelatoriosController } from './adapters/controllers/relatorios.controll
   providers: [
     OrcadorDeItens,
     AbrirOrdemServico,
+    AlterarStatusDaOrdem,
     IniciarDiagnostico,
     RegistrarDiagnostico,
     AprovarOrcamento,
