@@ -850,7 +850,7 @@ payloads e o princípio "comando automático não é rota".
 
 ## Vídeo demonstrativo
 
-🔗 **[Link do vídeo]** — *a preencher*
+🔗 **[Link do vídeo]** — *https://www.youtube.com/watch?si=QP-iADZR9Q7cpbh-&v=4WTo-nlOCAs&feature=youtu.be*
 
 Demonstra, no ambiente em execução:
 
